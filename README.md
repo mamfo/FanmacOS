@@ -56,9 +56,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-1.4.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-1.4.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-1.4.sha256` | somas de verificação |
+| `FanmacOS-1.5.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-1.5.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-1.5.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -82,8 +82,8 @@ O código e os releases vivem em [github.com/mamfo/FanmacOS](https://github.com/
 
 Para publicar uma versão nova:
 
-1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `1.4`).
-2. Faz commit e cria a tag `v1.4`; envia-a para o GitHub.
+1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `1.6`).
+2. Faz commit e cria a tag `v1.6`; envia-a para o GitHub.
 3. O workflow `.github/workflows/release.yml` compila a app num runner macOS, gera DMG, ZIP e SHA-256 e cria o release automaticamente.
 
 A primeira instalação de uma versão com atualizador tem de ser feita manualmente (arrastar para Aplicações). A partir daí, as máquinas recebem as versões seguintes sem intervenção.

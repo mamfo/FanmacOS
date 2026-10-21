@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             prefs.clearManualTargets()
         }
         scheduleTimer()
+        scheduleUpdateChecks()
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
