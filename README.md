@@ -56,9 +56,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-1.3.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-1.3.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-1.3.sha256` | somas de verificação |
+| `FanmacOS-1.4.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-1.4.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-1.4.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 

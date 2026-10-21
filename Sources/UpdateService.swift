@@ -149,7 +149,7 @@ final class UpdateService {
             if let checksumURL = update.checksumURL {
                 let (data, _) = try await session.data(from: checksumURL)
                 let checksumText = String(data: data, encoding: .utf8) ?? ""
-                guard let expected = Self.checksum(in: checksumText, for: zipURL.lastPathComponent),
+                guard let expected = Self.checksum(in: checksumText, for: update.zipURL.lastPathComponent),
                       expected.caseInsensitiveCompare(actualHash) == .orderedSame else {
                     throw UpdateError.checksumMismatch
                 }
@@ -202,6 +202,7 @@ final class UpdateService {
             .appendingPathComponent("fanmacos-update-\(UUID().uuidString).sh")
         let newAppPath = targetPath + ".new"
         let oldAppPath = targetPath + ".old"
+        let updateRoot = stagedApp.deletingLastPathComponent().deletingLastPathComponent()
 
         let script = """
         #!/bin/sh
@@ -218,6 +219,7 @@ final class UpdateService {
         /usr/bin/xattr -dr com.apple.quarantine \(shellQuote(targetPath)) 2>/dev/null || true
         /usr/bin/open \(shellQuote(targetPath))
         /bin/rm -rf \(shellQuote(oldAppPath))
+        /bin/rm -rf \(shellQuote(updateRoot.path))
         /bin/rm -f "$0"
         """
 
