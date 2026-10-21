@@ -37,6 +37,9 @@ enum TemperatureStyle {
 
 
 enum NetworkFormatting {
+    static let downloadColor = NSColor(srgbRed: 0.00, green: 0.44, blue: 1.00, alpha: 1.0)
+    static let uploadColor = NSColor(srgbRed: 0.72, green: 0.08, blue: 0.96, alpha: 1.0)
+
     private static let units = ["B/s", "KB/s", "MB/s", "GB/s"]
 
     private static let plainFormatter: NumberFormatter = {
@@ -75,25 +78,6 @@ enum NetworkFormatting {
         "↓ \(rate(network.download))  ↑ \(rate(network.upload))"
     }
 
-    static func coloredBar(download: Double, upload: Double) -> NSAttributedString {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        let title = NSMutableAttributedString(
-            string: "↓ \(rate(download))",
-            attributes: [
-                .font: font,
-                .foregroundColor: NSColor.systemBlue
-            ]
-        )
-        title.append(NSAttributedString(
-            string: "  ↑ \(rate(upload))",
-            attributes: [
-                .font: font,
-                .foregroundColor: NSColor.systemPurple
-            ]
-        ))
-        return title
-    }
-
     static func coloredInterface(_ network: NetworkRate) -> NSAttributedString {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         let paragraph = NSMutableParagraphStyle()
@@ -103,7 +87,7 @@ enum NetworkFormatting {
             string: "↓ \(rate(network.download))",
             attributes: [
                 .font: font,
-                .foregroundColor: NSColor.systemBlue,
+                .foregroundColor: downloadColor,
                 .paragraphStyle: paragraph
             ]
         )
@@ -111,10 +95,84 @@ enum NetworkFormatting {
             string: "  ↑ \(rate(network.upload))",
             attributes: [
                 .font: font,
-                .foregroundColor: NSColor.systemPurple,
+                .foregroundColor: uploadColor,
                 .paragraphStyle: paragraph
             ]
         ))
         return value
+    }
+}
+
+enum NetworkStatusImage {
+    static func make(download: Double, upload: Double) -> NSImage? {
+        let down = "↓ \(NetworkFormatting.rate(download))"
+        let up = "↑ \(NetworkFormatting.rate(upload))"
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.white
+        ]
+
+        let downSize = (down as NSString).size(withAttributes: textAttributes)
+        let upSize = (up as NSString).size(withAttributes: textAttributes)
+        let height: CGFloat = 18
+        let padding: CGFloat = 6
+        let gap: CGFloat = 4
+        let width = ceil(downSize.width + padding * 2 + gap + upSize.width + padding * 2) + 4
+        let scale: CGFloat = 2
+
+        let pixelWidth = Int(ceil(width * scale))
+        let pixelHeight = Int(ceil(height * scale))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelWidth,
+            pixelsHigh: pixelHeight,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return nil }
+
+        rep.size = NSSize(width: width, height: height)
+
+        NSGraphicsContext.saveGraphicsState()
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            NSGraphicsContext.restoreGraphicsState()
+            return nil
+        }
+        NSGraphicsContext.current = context
+
+        let downRect = NSRect(x: 0, y: 0, width: padding * 2 + downSize.width, height: height)
+        let upRect = NSRect(
+            x: downRect.width + gap,
+            y: 0,
+            width: padding * 2 + upSize.width,
+            height: height
+        )
+
+        NetworkFormatting.downloadColor.setFill()
+        NSBezierPath(roundedRect: downRect, xRadius: height / 2, yRadius: height / 2).fill()
+
+        NetworkFormatting.uploadColor.setFill()
+        NSBezierPath(roundedRect: upRect, xRadius: height / 2, yRadius: height / 2).fill()
+
+        (down as NSString).draw(
+            at: NSPoint(x: downRect.minX + padding, y: downRect.midY - downSize.height / 2),
+            withAttributes: textAttributes
+        )
+        (up as NSString).draw(
+            at: NSPoint(x: upRect.minX + padding, y: upRect.midY - upSize.height / 2),
+            withAttributes: textAttributes
+        )
+
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: NSSize(width: width, height: height))
+        image.addRepresentation(rep)
+        image.isTemplate = false
+        return image
     }
 }

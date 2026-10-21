@@ -404,12 +404,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         target.addItem(networkRow(
             name: "↓ Receber",
             value: NetworkFormatting.rate(networkSnapshot.download),
-            color: .systemBlue
+            color: NetworkFormatting.downloadColor
         ))
         target.addItem(networkRow(
             name: "↑ Enviar",
             value: NetworkFormatting.rate(networkSnapshot.upload),
-            color: .systemPurple
+            color: NetworkFormatting.uploadColor
         ))
 
         let interfacesItem = NSMenuItem(title: "Interfaces", action: nil, keyEquivalent: "")
@@ -426,7 +426,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 row.configure(
                     name: network.name,
                     attributedValue: NetworkFormatting.coloredInterface(network),
-                    dotColor: .systemBlue
+                    dotColor: NetworkFormatting.downloadColor
                 )
                 let item = NSMenuItem()
                 item.view = row
@@ -472,14 +472,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateNetworkStatusItem() {
         guard let button = networkStatusItem?.button else { return }
-        let title = NetworkFormatting.coloredBar(
+        button.image = NetworkStatusImage.make(
             download: networkSnapshot.download,
             upload: networkSnapshot.upload
         )
-        button.attributedTitle = title
-        button.imagePosition = .noImage
+        button.attributedTitle = NSAttributedString(string: "")
+        button.imagePosition = .imageOnly
         button.toolTip = networkTooltip()
-        button.setAccessibilityValue(title.string)
+        button.setAccessibilityValue(
+            "↓ \(NetworkFormatting.rate(networkSnapshot.download))  ↑ \(NetworkFormatting.rate(networkSnapshot.upload))"
+        )
     }
 
     private func networkTooltip() -> String {
