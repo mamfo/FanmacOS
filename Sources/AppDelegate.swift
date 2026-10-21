@@ -155,35 +155,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem.button else { return }
 
         let (value, caption) = displayedValue()
-        let showIcon = prefs.showIcon || prefs.mode == .iconOnly
-        button.image = showIcon ? statusImage() : nil
+        let text = value.map { TemperatureStyle.compact($0, unit: prefs.unit) } ?? "--"
 
         if prefs.mode == .iconOnly {
+            button.image = statusImage()
             button.attributedTitle = NSAttributedString(string: "")
             button.imagePosition = .imageOnly
-        } else if let value {
-            let color = TemperatureStyle.statusColor(value)
-            button.attributedTitle = NSAttributedString(
-                string: TemperatureStyle.compact(value, unit: prefs.unit),
-                attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-                    .foregroundColor: color
-                ]
-            )
-            button.imagePosition = showIcon ? .imageLeading : .noImage
         } else {
-            button.attributedTitle = NSAttributedString(
-                string: "--",
-                attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-                    .foregroundColor: NSColor.secondaryLabelColor
-                ]
-            )
-            button.imagePosition = showIcon ? .imageLeading : .noImage
+            let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
+            let image = StatusCapsuleImage.make([
+                CapsuleSegment(
+                    text: text,
+                    color: color,
+                    symbolName: prefs.showIcon ? "thermometer.medium" : nil
+                )
+            ], leadingPadding: 3)
+            button.image = image
+            button.attributedTitle = NSAttributedString(string: "")
+            button.imagePosition = .imageOnly
+
+            if image == nil {
+                button.image = nil
+                button.attributedTitle = NSAttributedString(
+                    string: text,
+                    attributes: [
+                        .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+                        .foregroundColor: NSColor.labelColor
+                    ]
+                )
+                button.imagePosition = .noImage
+            }
         }
 
         button.toolTip = tooltipText(caption: caption)
-        button.setAccessibilityValue(button.title)
+        button.setAccessibilityValue(text)
     }
 
     private func displayedValue() -> (Double?, String) {
@@ -472,10 +477,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateNetworkStatusItem() {
         guard let button = networkStatusItem?.button else { return }
-        button.image = NetworkStatusImage.make(
-            download: networkSnapshot.download,
-            upload: networkSnapshot.upload
-        )
+        button.image = StatusCapsuleImage.make([
+            CapsuleSegment(
+                text: "↓ \(NetworkFormatting.rate(networkSnapshot.download))",
+                color: NetworkFormatting.downloadColor,
+                symbolName: nil
+            ),
+            CapsuleSegment(
+                text: "↑ \(NetworkFormatting.rate(networkSnapshot.upload))",
+                color: NetworkFormatting.uploadColor,
+                symbolName: nil
+            )
+        ])
         button.attributedTitle = NSAttributedString(string: "")
         button.imagePosition = .imageOnly
         button.toolTip = networkTooltip()

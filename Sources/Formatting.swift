@@ -24,6 +24,19 @@ enum TemperatureStyle {
         }
     }
 
+    static func capsuleColor(_ celsius: Double) -> NSColor {
+        switch celsius {
+        case ..<60:
+            return NSColor(srgbRed: 0.05, green: 0.48, blue: 0.24, alpha: 1)
+        case ..<80:
+            return NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1)
+        default:
+            return NSColor(srgbRed: 0.73, green: 0.11, blue: 0.11, alpha: 1)
+        }
+    }
+
+    static let capsuleFallback = NSColor(srgbRed: 0.32, green: 0.32, blue: 0.36, alpha: 1)
+
     static func dotColor(_ celsius: Double) -> NSColor {
         switch celsius {
         case ..<45: return .systemTeal
@@ -103,30 +116,54 @@ enum NetworkFormatting {
     }
 }
 
-enum NetworkStatusImage {
-    static func make(download: Double, upload: Double) -> NSImage? {
-        let down = "↓ \(NetworkFormatting.rate(download))"
-        let up = "↑ \(NetworkFormatting.rate(upload))"
+struct CapsuleSegment {
+    let text: String
+    let color: NSColor
+    let symbolName: String?
+}
+
+enum StatusCapsuleImage {
+    static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {
+        guard !segments.isEmpty else { return nil }
+
         let font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white
         ]
-
-        let downSize = (down as NSString).size(withAttributes: textAttributes)
-        let upSize = (up as NSString).size(withAttributes: textAttributes)
         let height: CGFloat = 18
         let padding: CGFloat = 6
         let gap: CGFloat = 4
-        let width = ceil(downSize.width + padding * 2 + gap + upSize.width + padding * 2) + 4
+
+        struct Prepared {
+            let text: String
+            let color: NSColor
+            let symbol: NSImage?
+            let textSize: NSSize
+            let contentWidth: CGFloat
+        }
+
+        let prepared: [Prepared] = segments.map { segment in
+            let textSize = (segment.text as NSString).size(withAttributes: textAttributes)
+            let symbol = segment.symbolName.flatMap { tintedSymbol(named: $0) }
+            let symbolWidth = symbol.map { $0.size.width + 3 } ?? 0
+            return Prepared(
+                text: segment.text,
+                color: segment.color,
+                symbol: symbol,
+                textSize: textSize,
+                contentWidth: symbolWidth + textSize.width
+            )
+        }
+
+        let capsulesWidth = prepared.reduce(0) { $0 + $1.contentWidth + padding * 2 }
+        let width = ceil(leadingPadding + capsulesWidth + gap * CGFloat(max(0, prepared.count - 1)) + trailingPadding)
         let scale: CGFloat = 2
 
-        let pixelWidth = Int(ceil(width * scale))
-        let pixelHeight = Int(ceil(height * scale))
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: pixelWidth,
-            pixelsHigh: pixelHeight,
+            pixelsWide: Int(ceil(width * scale)),
+            pixelsHigh: Int(ceil(height * scale)),
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
@@ -145,33 +182,53 @@ enum NetworkStatusImage {
         }
         NSGraphicsContext.current = context
 
-        let downRect = NSRect(x: 0, y: 0, width: padding * 2 + downSize.width, height: height)
-        let upRect = NSRect(
-            x: downRect.width + gap,
-            y: 0,
-            width: padding * 2 + upSize.width,
-            height: height
-        )
+        var x: CGFloat = leadingPadding
+        for item in prepared {
+            let rect = NSRect(x: x, y: 0, width: padding * 2 + item.contentWidth, height: height)
+            item.color.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: height / 2, yRadius: height / 2).fill()
 
-        NetworkFormatting.downloadColor.setFill()
-        NSBezierPath(roundedRect: downRect, xRadius: height / 2, yRadius: height / 2).fill()
+            var contentX = rect.minX + padding
+            if let symbol = item.symbol {
+                symbol.draw(in: NSRect(
+                    x: contentX,
+                    y: (height - symbol.size.height) / 2,
+                    width: symbol.size.width,
+                    height: symbol.size.height
+                ))
+                contentX += symbol.size.width + 3
+            }
 
-        NetworkFormatting.uploadColor.setFill()
-        NSBezierPath(roundedRect: upRect, xRadius: height / 2, yRadius: height / 2).fill()
+            (item.text as NSString).draw(
+                at: NSPoint(x: contentX, y: rect.midY - item.textSize.height / 2),
+                withAttributes: textAttributes
+            )
 
-        (down as NSString).draw(
-            at: NSPoint(x: downRect.minX + padding, y: downRect.midY - downSize.height / 2),
-            withAttributes: textAttributes
-        )
-        (up as NSString).draw(
-            at: NSPoint(x: upRect.minX + padding, y: upRect.midY - upSize.height / 2),
-            withAttributes: textAttributes
-        )
+            x = rect.maxX + gap
+        }
 
         NSGraphicsContext.restoreGraphicsState()
 
         let image = NSImage(size: NSSize(width: width, height: height))
         image.addRepresentation(rep)
+        image.isTemplate = false
+        return image
+    }
+
+    private static func tintedSymbol(named name: String) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) else {
+            return nil
+        }
+
+        let size = symbol.size
+        let image = NSImage(size: size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            NSColor.white.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
         image.isTemplate = false
         return image
     }
