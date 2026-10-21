@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)
+          echo "Versão: $VERSION | Tag: $GITHUB_REF_NAME"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "A tag não corresponde à versão em Resources/Info.plist." >&2
+            exit 1
+          fi
+
+      - name: Build and package
+        run: |
+          chmod +x build.sh scripts/build-icon.sh scripts/make-dist.sh
+          make dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/FanmacOS-*.dmg
+            dist/FanmacOS-*.zip
+            dist/FanmacOS-*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
