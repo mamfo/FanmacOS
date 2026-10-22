@@ -7,6 +7,7 @@ App de barra de menus para macOS que mostra as temperaturas do hardware junto ao
 ## Funcionalidades
 
 - Temperatura da CPU em tempo real na barra de menus, com ícone e cor por faixa (normal, morna, quente).
+- Cápsulas de largura fixa e 18 px de altura, para a barra não se deslocar quando os valores mudam.
 - Menu com CPU (máxima e média), SSD/NAND, outros sensores e a lista completa de sensores.
 - Escolha do que mostrar na barra: CPU, máxima do sistema, SSD, sensor específico ou apenas o ícone.
 - Intervalo de atualização configurável (1, 2, 5, 10 ou 30 segundos).
@@ -57,9 +58,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-1.9.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-1.9.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-1.9.sha256` | somas de verificação |
+| `FanmacOS-2.0.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.0.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.0.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 

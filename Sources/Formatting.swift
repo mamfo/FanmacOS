@@ -170,19 +170,46 @@ struct CapsuleSegment {
     let text: String
     let color: NSColor
     let symbolName: String?
+    let fixedTextWidth: CGFloat?
+
+    init(text: String, color: NSColor, symbolName: String? = nil, fixedTextWidth: CGFloat? = nil) {
+        self.text = text
+        self.color = color
+        self.symbolName = symbolName
+        self.fixedTextWidth = fixedTextWidth
+    }
 }
 
 enum StatusCapsuleImage {
+    private static let capsuleFont = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
+
+    static let networkTextWidth = measuredWidth([
+        "↓ 999,9 MB/s",
+        "↑ 999,9 MB/s",
+        "↓ 999,9 KB/s",
+        "↑ 999,9 KB/s"
+    ])
+    static let diskTextWidth = measuredWidth([
+        "R 999,9 MB/s",
+        "W 999,9 MB/s",
+        "R 999,9 KB/s",
+        "W 999,9 KB/s"
+    ])
+    static let temperatureTextWidth = measuredWidth([
+        "212°F",
+        "100°C",
+        "-10°C"
+    ])
+
     static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {
         guard !segments.isEmpty else { return nil }
 
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
         let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: font,
+            .font: capsuleFont,
             .foregroundColor: NSColor.white
         ]
         let imageHeight: CGFloat = 18
-        let capsuleHeight: CGFloat = 16
+        let capsuleHeight: CGFloat = 18
         let padding: CGFloat = 6
         let gap: CGFloat = 4
 
@@ -192,18 +219,21 @@ enum StatusCapsuleImage {
             let symbol: NSImage?
             let textSize: NSSize
             let contentWidth: CGFloat
+            let actualContentWidth: CGFloat
         }
 
         let prepared: [Prepared] = segments.map { segment in
             let textSize = (segment.text as NSString).size(withAttributes: textAttributes)
             let symbol = segment.symbolName.flatMap { tintedSymbol(named: $0) }
             let symbolWidth = symbol.map { $0.size.width + 3 } ?? 0
+            let textWidth = max(textSize.width, segment.fixedTextWidth ?? 0)
             return Prepared(
                 text: segment.text,
                 color: segment.color,
                 symbol: symbol,
                 textSize: textSize,
-                contentWidth: symbolWidth + textSize.width
+                contentWidth: symbolWidth + textWidth,
+                actualContentWidth: symbolWidth + textSize.width
             )
         }
 
@@ -244,7 +274,8 @@ enum StatusCapsuleImage {
             item.color.setFill()
             NSBezierPath(roundedRect: rect, xRadius: capsuleHeight / 2, yRadius: capsuleHeight / 2).fill()
 
-            var contentX = rect.minX + padding
+            let inset = max(0, (item.contentWidth - item.actualContentWidth) / 2)
+            var contentX = rect.minX + padding + inset
             if let symbol = item.symbol {
                 symbol.draw(in: NSRect(
                     x: contentX,
@@ -269,6 +300,14 @@ enum StatusCapsuleImage {
         image.addRepresentation(rep)
         image.isTemplate = false
         return image
+    }
+
+    private static func measuredWidth(_ strings: [String]) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [.font: capsuleFont]
+        let maximum = strings
+            .map { ($0 as NSString).size(withAttributes: attributes).width }
+            .max() ?? 0
+        return ceil(maximum) + 4
     }
 
     private static func tintedSymbol(named name: String) -> NSImage? {

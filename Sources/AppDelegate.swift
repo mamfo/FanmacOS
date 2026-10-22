@@ -178,7 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 CapsuleSegment(
                     text: text,
                     color: color,
-                    symbolName: prefs.showIcon ? "thermometer.medium" : nil
+                    symbolName: prefs.showIcon ? "thermometer.medium" : nil,
+                    fixedTextWidth: StatusCapsuleImage.temperatureTextWidth
                 )
             ], leadingPadding: 3)
             button.image = image
@@ -551,12 +552,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             CapsuleSegment(
                 text: "R \(RateFormatting.rate(read))",
                 color: DiskFormatting.readColor,
-                symbolName: symbol
+                symbolName: symbol,
+                fixedTextWidth: StatusCapsuleImage.diskTextWidth
             ),
             CapsuleSegment(
                 text: "W \(RateFormatting.rate(write))",
                 color: DiskFormatting.writeColor,
-                symbolName: nil
+                fixedTextWidth: StatusCapsuleImage.diskTextWidth
             )
         ])
         button.attributedTitle = NSAttributedString(string: "")
@@ -652,12 +654,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             CapsuleSegment(
                 text: "↓ \(NetworkFormatting.rate(networkSnapshot.download))",
                 color: NetworkFormatting.downloadColor,
-                symbolName: nil
+                fixedTextWidth: StatusCapsuleImage.networkTextWidth
             ),
             CapsuleSegment(
                 text: "↑ \(NetworkFormatting.rate(networkSnapshot.upload))",
                 color: NetworkFormatting.uploadColor,
-                symbolName: nil
+                fixedTextWidth: StatusCapsuleImage.networkTextWidth
             )
         ])
         button.attributedTitle = NSAttributedString(string: "")
