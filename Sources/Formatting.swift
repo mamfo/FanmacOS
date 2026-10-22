@@ -181,7 +181,8 @@ enum StatusCapsuleImage {
             .font: font,
             .foregroundColor: NSColor.white
         ]
-        let height: CGFloat = 18
+        let imageHeight: CGFloat = 18
+        let capsuleHeight: CGFloat = 16
         let padding: CGFloat = 6
         let gap: CGFloat = 4
 
@@ -213,7 +214,7 @@ enum StatusCapsuleImage {
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(ceil(width * scale)),
-            pixelsHigh: Int(ceil(height * scale)),
+            pixelsHigh: Int(ceil(imageHeight * scale)),
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
@@ -223,7 +224,7 @@ enum StatusCapsuleImage {
             bitsPerPixel: 0
         ) else { return nil }
 
-        rep.size = NSSize(width: width, height: height)
+        rep.size = NSSize(width: width, height: imageHeight)
 
         NSGraphicsContext.saveGraphicsState()
         guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
@@ -234,15 +235,20 @@ enum StatusCapsuleImage {
 
         var x: CGFloat = leadingPadding
         for item in prepared {
-            let rect = NSRect(x: x, y: 0, width: padding * 2 + item.contentWidth, height: height)
+            let rect = NSRect(
+                x: x,
+                y: (imageHeight - capsuleHeight) / 2,
+                width: padding * 2 + item.contentWidth,
+                height: capsuleHeight
+            )
             item.color.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: height / 2, yRadius: height / 2).fill()
+            NSBezierPath(roundedRect: rect, xRadius: capsuleHeight / 2, yRadius: capsuleHeight / 2).fill()
 
             var contentX = rect.minX + padding
             if let symbol = item.symbol {
                 symbol.draw(in: NSRect(
                     x: contentX,
-                    y: (height - symbol.size.height) / 2,
+                    y: rect.midY - symbol.size.height / 2,
                     width: symbol.size.width,
                     height: symbol.size.height
                 ))
@@ -259,7 +265,7 @@ enum StatusCapsuleImage {
 
         NSGraphicsContext.restoreGraphicsState()
 
-        let image = NSImage(size: NSSize(width: width, height: height))
+        let image = NSImage(size: NSSize(width: width, height: imageHeight))
         image.addRepresentation(rep)
         image.isTemplate = false
         return image
