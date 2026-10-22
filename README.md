@@ -7,7 +7,7 @@ App de barra de menus para macOS que mostra as temperaturas do hardware junto ao
 ## Funcionalidades
 
 - Temperatura da CPU em tempo real na barra de menus, com ícone e cor por faixa (normal, morna, quente).
-- Cápsulas de largura fixa e altura proporcional à barra (20–22 px), para a barra não se deslocar quando os valores mudam.
+- Cápsulas de largura fixa e altura proporcional à barra (20–22 px), num único item junto ao relógio, para a barra não se deslocar quando os valores mudam.
 - Menu com CPU (máxima e média), SSD/NAND, outros sensores e a lista completa de sensores.
 - Escolha do que mostrar na barra: CPU, máxima do sistema, SSD, sensor específico ou apenas o ícone.
 - Intervalo de atualização configurável (1, 2, 5, 10 ou 30 segundos).
@@ -58,9 +58,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.2.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.2.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.2.sha256` | somas de verificação |
+| `FanmacOS-2.3.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.3.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.3.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -108,14 +108,14 @@ Cada família é classificada assim:
 
 O tráfego é lido localmente através de `sysctl(NET_RT_IFLIST2)`, que expõe contadores de 64 bits por interface. São consideradas as interfaces físicas `en*` (Wi‑Fi, Ethernet, Thunderbolt, iPhone USB) e `pdp_ip*`; interfaces virtuais (`utun`, `awdl`, `llw`, `bridge`) não entram na soma. A velocidade é calculada entre amostras consecutivas e atualizada ao mesmo ritmo das temperaturas.
 
-No menu aparecem os totais **↓ Receber** / **↑ Enviar** e um submenu **Interfaces** com cada placa. O segundo item da barra pode ser escondido em **Mostrar rede na barra**.
+No menu aparecem os totais **↓ Receber** / **↑ Enviar** e um submenu **Interfaces** com cada placa. As cápsulas de rede fazem parte do item único da app, o mais à direita possível (junto ao relógio), e podem ser escondidas em **Mostrar rede na barra**.
 
 ### Discos
 
 As estatísticas vêm do `IOBlockStorageDriver` do IOKit (`Bytes (Read)` / `Bytes (Write)`), sem root. Cada disco físico é identificado pelo nome BSD (`disk4`, etc.) e os metadados (nome, protocolo USB/SD, interno/virtual) são lidos com `diskutil info -plist` apenas quando um disco aparece.
 
-- A barra mostra cápsulas **R** (leitura, azul-petróleo) e **W** (escrita, âmbar) com o total dos discos externos.
-- O item da barra aparece automaticamente quando ligas um cartão SD, pen USB ou disco externo e desaparece quando o retiras.
+- A barra mostra cápsulas **R** (leitura, azul-petróleo) e **W** (escrita, âmbar) com o total dos discos externos, dentro do item único da app.
+- As cápsulas de disco aparecem automaticamente quando ligas um cartão SD, pen USB ou disco externo e desaparecem quando o retiras.
 - Em **Mostrar discos na barra** podes desligar o item; **Incluir disco interno na barra** acrescenta o SSD interno.
 - O menu **DISCOS** lista todos os discos físicos, incluindo o interno, com as velocidades de leitura/escrita.
 

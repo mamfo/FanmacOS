@@ -5,7 +5,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let prefs = Preferences.shared
     private let monitor = TemperatureMonitor()
     private let fanService = FanControlService()
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let statusItem: NSStatusItem = {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = StatusItemPositioning.temperatureName
+        return item
+    }()
     private let menu = NSMenu()
     private let refreshIntervals: [TimeInterval] = [1, 2, 5, 10, 30]
     private var snapshot = TemperatureSnapshot.empty
@@ -16,12 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var wakeObserver: NSObjectProtocol?
     private var lastFanReassert = Date.distantPast
     private let networkMonitor = NetworkMonitor()
-    private let networkMenu = NSMenu()
-    private var networkStatusItem: NSStatusItem?
     private var networkSnapshot = NetworkSnapshot.empty
     private let diskMonitor = DiskMonitor()
-    private let diskMenu = NSMenu()
-    private var diskStatusItem: NSStatusItem?
     private var diskSnapshot = DiskSnapshot.empty
     private let updateService = UpdateService()
     private var availableUpdate: UpdateInfo?
@@ -36,13 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.minimumWidth = 284
         statusItem.menu = menu
-
-        networkMenu.delegate = self
-        networkMenu.minimumWidth = 284
-        setupNetworkStatusItem()
-
-        diskMenu.delegate = self
-        diskMenu.minimumWidth = 284
 
         refresh()
         if !fans.contains(where: { $0.manual }) {
@@ -110,8 +103,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshFans()
         superviseManualFans()
         updateStatusItem()
-        updateNetworkStatusItem()
-        refreshDiskStatusItem()
         fanWindow?.update(fans: fans)
     }
 
@@ -173,15 +164,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.attributedTitle = NSAttributedString(string: "")
             button.imagePosition = .imageOnly
         } else {
+            var segments: [CapsuleSegment] = []
+            let disks = relevantDisks
+
+            if prefs.showDiskInMenuBar, !disks.isEmpty {
+                let read = disks.reduce(0) { $0 + $1.readRate }
+                let write = disks.reduce(0) { $0 + $1.writeRate }
+                let symbol = disks.contains { !$0.isInternal } ? "externaldrive" : "internaldrive"
+
+                segments.append(CapsuleSegment(
+                    text: "R \(RateFormatting.rate(read))",
+                    color: DiskFormatting.readColor,
+                    symbolName: symbol,
+                    fixedTextWidth: StatusCapsuleImage.diskTextWidth
+                ))
+                segments.append(CapsuleSegment(
+                    text: "W \(RateFormatting.rate(write))",
+                    color: DiskFormatting.writeColor,
+                    fixedTextWidth: StatusCapsuleImage.diskTextWidth
+                ))
+            }
+
+            if prefs.showNetworkInMenuBar {
+                segments.append(CapsuleSegment(
+                    text: "↓ \(NetworkFormatting.rate(networkSnapshot.download))",
+                    color: NetworkFormatting.downloadColor,
+                    fixedTextWidth: StatusCapsuleImage.networkTextWidth
+                ))
+                segments.append(CapsuleSegment(
+                    text: "↑ \(NetworkFormatting.rate(networkSnapshot.upload))",
+                    color: NetworkFormatting.uploadColor,
+                    fixedTextWidth: StatusCapsuleImage.networkTextWidth
+                ))
+            }
+
             let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
-            let image = StatusCapsuleImage.make([
-                CapsuleSegment(
-                    text: text,
-                    color: color,
-                    symbolName: prefs.showIcon ? "thermometer.medium" : nil,
-                    fixedTextWidth: StatusCapsuleImage.temperatureTextWidth
-                )
-            ], leadingPadding: 3)
+            segments.append(CapsuleSegment(
+                text: text,
+                color: color,
+                symbolName: prefs.showIcon ? "thermometer.medium" : nil,
+                fixedTextWidth: StatusCapsuleImage.temperatureTextWidth
+            ))
+
+            let image = StatusCapsuleImage.make(segments)
             button.image = image
             button.attributedTitle = NSAttributedString(string: "")
             button.imagePosition = .imageOnly
@@ -237,6 +262,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lines.append("Ventoinha \(fan.index + 1): \(FanCardView.rpmText(fan.actualRPM))\(fan.manual ? " · manual" : "")")
         }
         lines.append("Rede ↓ \(NetworkFormatting.rate(networkSnapshot.download))  ↑ \(NetworkFormatting.rate(networkSnapshot.upload))")
+        for disk in relevantDisks {
+            lines.append("\(disk.name): R \(RateFormatting.rate(disk.readRate))  W \(RateFormatting.rate(disk.writeRate))")
+        }
         let time = DateFormatter.localizedString(from: snapshot.date, dateStyle: .none, timeStyle: .medium)
         lines.append("Atualizado às \(time)")
         return lines.joined(separator: "\n")
@@ -244,13 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         refresh()
-        if menu === networkMenu {
-            rebuildNetworkMenu()
-        } else if menu === diskMenu {
-            rebuildDiskMenu()
-        } else {
-            rebuildMenu()
-        }
+        rebuildMenu()
     }
 
     private func rebuildMenu() {
@@ -388,49 +410,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return footer
     }
 
-    private func rebuildNetworkMenu() {
-        networkMenu.removeAllItems()
-
-        let title = NSMenuItem()
-        title.attributedTitle = NSAttributedString(
-            string: "REDE",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-                .foregroundColor: NSColor.secondaryLabelColor
-            ]
-        )
-        title.isEnabled = false
-        networkMenu.addItem(title)
-
-        addNetworkItems(to: networkMenu)
-        networkMenu.addItem(.separator())
-
-        let barItem = NSMenuItem(title: "Mostrar rede na barra", action: #selector(toggleNetworkInBar), keyEquivalent: "")
-        barItem.target = self
-        barItem.state = prefs.showNetworkInMenuBar ? .on : .off
-        networkMenu.addItem(barItem)
-
-        let refreshItem = NSMenuItem(title: "Atualizar agora", action: #selector(refreshNow), keyEquivalent: "")
-        refreshItem.target = self
-        networkMenu.addItem(refreshItem)
-
-        networkMenu.addItem(.separator())
-
-        let fanItem = NSMenuItem(title: "Controlo das ventoinhas…", action: #selector(openFanControl), keyEquivalent: "")
-        fanItem.target = self
-        networkMenu.addItem(fanItem)
-
-        let aboutItem = NSMenuItem(title: "Sobre o FanmacOS", action: #selector(showAbout), keyEquivalent: "")
-        aboutItem.target = self
-        networkMenu.addItem(aboutItem)
-
-        let quitItem = NSMenuItem(title: "Sair do FanmacOS", action: #selector(quit), keyEquivalent: "q")
-        quitItem.target = self
-        networkMenu.addItem(quitItem)
-
-        networkMenu.addItem(footerMenuItem())
-    }
-
     private func addNetworkItems(to target: NSMenu) {
         target.addItem(networkRow(
             name: "↓ Receber",
@@ -513,185 +492,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return result
     }
 
-    private func refreshDiskStatusItem() {
-        let relevant = relevantDisks
-        let shouldShow = prefs.showDiskInMenuBar && !relevant.isEmpty
-
-        if shouldShow {
-            if diskStatusItem == nil {
-                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                item.button?.setAccessibilityLabel("Velocidade dos discos")
-                item.menu = diskMenu
-                diskStatusItem = item
-            }
-            updateDiskStatusItem(relevant)
-        } else if diskStatusItem != nil {
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                if !(self.prefs.showDiskInMenuBar && !self.relevantDisks.isEmpty) {
-                    self.removeDiskStatusItem()
-                }
-            }
-        }
-    }
-
-    private func removeDiskStatusItem() {
-        guard let item = diskStatusItem else { return }
-        NSStatusBar.system.removeStatusItem(item)
-        diskStatusItem = nil
-    }
-
-    private func updateDiskStatusItem(_ relevant: [DiskInfo]) {
-        guard let button = diskStatusItem?.button else { return }
-
-        let read = relevant.reduce(0) { $0 + $1.readRate }
-        let write = relevant.reduce(0) { $0 + $1.writeRate }
-        let symbol = relevant.contains { !$0.isInternal } ? "externaldrive" : "internaldrive"
-
-        button.image = StatusCapsuleImage.make([
-            CapsuleSegment(
-                text: "R \(RateFormatting.rate(read))",
-                color: DiskFormatting.readColor,
-                symbolName: symbol,
-                fixedTextWidth: StatusCapsuleImage.diskTextWidth
-            ),
-            CapsuleSegment(
-                text: "W \(RateFormatting.rate(write))",
-                color: DiskFormatting.writeColor,
-                fixedTextWidth: StatusCapsuleImage.diskTextWidth
-            )
-        ])
-        button.attributedTitle = NSAttributedString(string: "")
-        button.imagePosition = .imageOnly
-        button.toolTip = diskTooltip(relevant)
-        button.setAccessibilityValue(
-            "Leitura \(RateFormatting.rate(read)), escrita \(RateFormatting.rate(write))"
-        )
-    }
-
-    private func diskTooltip(_ relevant: [DiskInfo]) -> String {
-        let read = relevant.reduce(0) { $0 + $1.readRate }
-        let write = relevant.reduce(0) { $0 + $1.writeRate }
-        var lines = ["Discos — R \(RateFormatting.rate(read))  W \(RateFormatting.rate(write))"]
-        for disk in relevant {
-            lines.append(
-                "\(disk.name): R \(RateFormatting.rate(disk.readRate))  W \(RateFormatting.rate(disk.writeRate))"
-            )
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private func rebuildDiskMenu() {
-        diskMenu.removeAllItems()
-        addDiskItems(to: diskMenu)
-        diskMenu.addItem(.separator())
-
-        let showItem = NSMenuItem(title: "Mostrar discos na barra", action: #selector(toggleShowDiskInBar), keyEquivalent: "")
-        showItem.target = self
-        showItem.state = prefs.showDiskInMenuBar ? .on : .off
-        diskMenu.addItem(showItem)
-
-        let internalItem = NSMenuItem(title: "Incluir disco interno na barra", action: #selector(toggleIncludeInternalDisk), keyEquivalent: "")
-        internalItem.target = self
-        internalItem.state = prefs.diskIncludeInternal ? .on : .off
-        diskMenu.addItem(internalItem)
-
-        let refreshItem = NSMenuItem(title: "Atualizar agora", action: #selector(refreshNow), keyEquivalent: "")
-        refreshItem.target = self
-        diskMenu.addItem(refreshItem)
-
-        diskMenu.addItem(.separator())
-
-        let updateItem = NSMenuItem(title: "Procurar atualizações…", action: #selector(checkForUpdatesMenu), keyEquivalent: "")
-        updateItem.target = self
-        diskMenu.addItem(updateItem)
-
-        let aboutItem = NSMenuItem(title: "Sobre o FanmacOS", action: #selector(showAbout), keyEquivalent: "")
-        aboutItem.target = self
-        diskMenu.addItem(aboutItem)
-
-        let quitItem = NSMenuItem(title: "Sair do FanmacOS", action: #selector(quit), keyEquivalent: "q")
-        quitItem.target = self
-        diskMenu.addItem(quitItem)
-        diskMenu.addItem(footerMenuItem())
-    }
-
     @objc private func toggleShowDiskInBar() {
         prefs.showDiskInMenuBar.toggle()
-        refreshDiskStatusItem()
+        updateStatusItem()
     }
 
     @objc private func toggleIncludeInternalDisk() {
         prefs.diskIncludeInternal.toggle()
-        refreshDiskStatusItem()
-    }
-
-    private func setupNetworkStatusItem() {
-        guard prefs.showNetworkInMenuBar else {
-            removeNetworkStatusItem()
-            return
-        }
-        guard networkStatusItem == nil else { return }
-
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = nil
-        item.button?.imagePosition = .noImage
-        item.button?.setAccessibilityLabel("Tráfego de rede")
-        item.menu = networkMenu
-        networkStatusItem = item
-        updateNetworkStatusItem()
-    }
-
-    private func removeNetworkStatusItem() {
-        guard let item = networkStatusItem else { return }
-        NSStatusBar.system.removeStatusItem(item)
-        networkStatusItem = nil
-    }
-
-    private func updateNetworkStatusItem() {
-        guard let button = networkStatusItem?.button else { return }
-        button.image = StatusCapsuleImage.make([
-            CapsuleSegment(
-                text: "↓ \(NetworkFormatting.rate(networkSnapshot.download))",
-                color: NetworkFormatting.downloadColor,
-                fixedTextWidth: StatusCapsuleImage.networkTextWidth
-            ),
-            CapsuleSegment(
-                text: "↑ \(NetworkFormatting.rate(networkSnapshot.upload))",
-                color: NetworkFormatting.uploadColor,
-                fixedTextWidth: StatusCapsuleImage.networkTextWidth
-            )
-        ])
-        button.attributedTitle = NSAttributedString(string: "")
-        button.imagePosition = .imageOnly
-        button.toolTip = networkTooltip()
-        button.setAccessibilityValue(
-            "↓ \(NetworkFormatting.rate(networkSnapshot.download))  ↑ \(NetworkFormatting.rate(networkSnapshot.upload))"
-        )
-    }
-
-    private func networkTooltip() -> String {
-        var lines = [
-            "Rede — ↓ \(NetworkFormatting.rate(networkSnapshot.download))  ↑ \(NetworkFormatting.rate(networkSnapshot.upload))"
-        ]
-        for network in networkSnapshot.interfaces.prefix(6) {
-            lines.append("\(network.name): \(NetworkFormatting.interfaceSummary(network))")
-        }
-        if networkSnapshot.interfaces.isEmpty {
-            lines.append("Sem interfaces de rede com tráfego")
-        }
-        return lines.joined(separator: "\n")
+        updateStatusItem()
     }
 
     @objc private func toggleNetworkInBar() {
         prefs.showNetworkInMenuBar.toggle()
-        if prefs.showNetworkInMenuBar {
-            setupNetworkStatusItem()
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.removeNetworkStatusItem()
-            }
-        }
+        updateStatusItem()
     }
 
     private func rowItem(name: String, celsius: Double?, width: CGFloat? = nil, bold: Bool = false) -> NSMenuItem {
