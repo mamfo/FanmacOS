@@ -40,6 +40,8 @@ final class Preferences {
         static let manualTargets = "manualFanTargets"
         static let networkBar = "showNetworkInMenuBar"
         static let autoUpdates = "autoUpdates"
+        static let diskBar = "showDiskInMenuBar"
+        static let diskInternal = "diskIncludeInternal"
     }
 
     private let defaults = UserDefaults.standard
@@ -52,7 +54,9 @@ final class Preferences {
             Key.interval: 2.0,
             Key.restoreFans: true,
             Key.networkBar: true,
-            Key.autoUpdates: true
+            Key.autoUpdates: true,
+            Key.diskBar: true,
+            Key.diskInternal: false
         ])
     }
 
@@ -133,5 +137,18 @@ final class Preferences {
             return defaults.bool(forKey: Key.autoUpdates)
         }
         set { defaults.set(newValue, forKey: Key.autoUpdates) }
+    }
+
+    var showDiskInMenuBar: Bool {
+        get {
+            if defaults.object(forKey: Key.diskBar) == nil { return true }
+            return defaults.bool(forKey: Key.diskBar)
+        }
+        set { defaults.set(newValue, forKey: Key.diskBar) }
+    }
+
+    var diskIncludeInternal: Bool {
+        get { defaults.bool(forKey: Key.diskInternal) }
+        set { defaults.set(newValue, forKey: Key.diskInternal) }
     }
 }

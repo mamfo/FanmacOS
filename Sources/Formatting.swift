@@ -49,10 +49,7 @@ enum TemperatureStyle {
 }
 
 
-enum NetworkFormatting {
-    static let downloadColor = NSColor(srgbRed: 0.00, green: 0.44, blue: 1.00, alpha: 1.0)
-    static let uploadColor = NSColor(srgbRed: 0.72, green: 0.08, blue: 0.96, alpha: 1.0)
-
+enum RateFormatting {
     private static let units = ["B/s", "KB/s", "MB/s", "GB/s"]
 
     private static let plainFormatter: NumberFormatter = {
@@ -86,6 +83,15 @@ enum NetworkFormatting {
         let number = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.\(digits)f", value)
         return "\(number) \(units[unit])"
     }
+}
+
+enum NetworkFormatting {
+    static let downloadColor = NSColor(srgbRed: 0.00, green: 0.44, blue: 1.00, alpha: 1.0)
+    static let uploadColor = NSColor(srgbRed: 0.72, green: 0.08, blue: 0.96, alpha: 1.0)
+
+    static func rate(_ bytesPerSecond: Double) -> String {
+        RateFormatting.rate(bytesPerSecond)
+    }
 
     static func interfaceSummary(_ network: NetworkRate) -> String {
         "↓ \(rate(network.download))  ↑ \(rate(network.upload))"
@@ -113,6 +119,50 @@ enum NetworkFormatting {
             ]
         ))
         return value
+    }
+}
+
+enum DiskFormatting {
+    static let readColor = NSColor(srgbRed: 0.04, green: 0.44, blue: 0.52, alpha: 1.0)
+    static let writeColor = NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1.0)
+
+    static func summary(read: Double, write: Double) -> String {
+        "R \(RateFormatting.rate(read))  W \(RateFormatting.rate(write))"
+    }
+
+    static func coloredSummary(read: Double, write: Double) -> NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .right
+
+        let value = NSMutableAttributedString(
+            string: "R \(RateFormatting.rate(read))",
+            attributes: [
+                .font: font,
+                .foregroundColor: readColor,
+                .paragraphStyle: paragraph
+            ]
+        )
+        value.append(NSAttributedString(
+            string: "  W \(RateFormatting.rate(write))",
+            attributes: [
+                .font: font,
+                .foregroundColor: writeColor,
+                .paragraphStyle: paragraph
+            ]
+        ))
+        return value
+    }
+}
+
+extension DiskKind {
+    var dotColor: NSColor {
+        switch self {
+        case .internalDisk: return .secondaryLabelColor
+        case .sdCard: return .systemTeal
+        case .usb: return .systemOrange
+        case .external: return .systemBlue
+        }
     }
 }
 

@@ -19,6 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let networkMenu = NSMenu()
     private var networkStatusItem: NSStatusItem?
     private var networkSnapshot = NetworkSnapshot.empty
+    private let diskMonitor = DiskMonitor()
+    private let diskMenu = NSMenu()
+    private var diskStatusItem: NSStatusItem?
+    private var diskSnapshot = DiskSnapshot.empty
     private let updateService = UpdateService()
     private var availableUpdate: UpdateInfo?
     private var updateCheckTimer: Timer?
@@ -37,12 +41,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         networkMenu.minimumWidth = 284
         setupNetworkStatusItem()
 
+        diskMenu.delegate = self
+        diskMenu.minimumWidth = 284
+
         refresh()
         if !fans.contains(where: { $0.manual }) {
             prefs.clearManualTargets()
         }
         scheduleTimer()
         scheduleUpdateChecks()
+
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
@@ -52,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.monitor.invalidate()
             self.fanController = try? FanController()
             self.networkMonitor.reset()
+            self.diskMonitor.reset()
             self.refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 self?.reapplyManualFans()
@@ -97,10 +106,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func refresh() {
         snapshot = monitor.snapshot()
         networkSnapshot = networkMonitor.sample()
+        diskSnapshot = diskMonitor.sample()
         refreshFans()
         superviseManualFans()
         updateStatusItem()
         updateNetworkStatusItem()
+        refreshDiskStatusItem()
         fanWindow?.update(fans: fans)
     }
 
@@ -234,6 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         if menu === networkMenu {
             rebuildNetworkMenu()
+        } else if menu === diskMenu {
+            rebuildDiskMenu()
         } else {
             rebuildMenu()
         }
@@ -274,6 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         addNetworkItems(to: menu)
         menu.addItem(.separator())
+        addDiskItems(to: menu)
+        menu.addItem(.separator())
         menu.addItem(allSensorsItem())
         menu.addItem(.separator())
 
@@ -289,6 +304,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         networkBarItem.target = self
         networkBarItem.state = prefs.showNetworkInMenuBar ? .on : .off
         menu.addItem(networkBarItem)
+
+        let diskBarItem = NSMenuItem(title: "Mostrar discos na barra", action: #selector(toggleShowDiskInBar), keyEquivalent: "")
+        diskBarItem.target = self
+        diskBarItem.state = prefs.showDiskInMenuBar ? .on : .off
+        menu.addItem(diskBarItem)
+
+        let internalDiskItem = NSMenuItem(title: "Incluir disco interno na barra", action: #selector(toggleIncludeInternalDisk), keyEquivalent: "")
+        internalDiskItem.target = self
+        internalDiskItem.state = prefs.diskIncludeInternal ? .on : .off
+        menu.addItem(internalDiskItem)
 
         let unitItem = NSMenuItem(title: "Mostrar em Fahrenheit", action: #selector(toggleFahrenheit), keyEquivalent: "")
         unitItem.target = self
@@ -451,6 +476,152 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.view = view
         item.isEnabled = false
         return item
+    }
+
+    private func addDiskItems(to target: NSMenu) {
+        target.addItem(sectionHeader("Discos"))
+
+        guard !diskSnapshot.disks.isEmpty else {
+            let item = NSMenuItem(title: "Sem discos detetados", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            target.addItem(item)
+            return
+        }
+
+        for disk in diskSnapshot.disks {
+            let view = SensorRowView(width: menu.minimumWidth - 8, valueWidth: 168)
+            view.configure(
+                name: disk.name,
+                attributedValue: DiskFormatting.coloredSummary(read: disk.readRate, write: disk.writeRate),
+                dotColor: disk.kind.dotColor
+            )
+            view.toolTip = "\(disk.detail) · leitura \(RateFormatting.rate(disk.readRate)) · escrita \(RateFormatting.rate(disk.writeRate))"
+
+            let item = NSMenuItem()
+            item.view = view
+            item.isEnabled = false
+            target.addItem(item)
+        }
+    }
+
+    private var relevantDisks: [DiskInfo] {
+        var result = diskSnapshot.externalDisks
+        if prefs.diskIncludeInternal {
+            result += diskSnapshot.internalDisks
+        }
+        return result
+    }
+
+    private func refreshDiskStatusItem() {
+        let relevant = relevantDisks
+        let shouldShow = prefs.showDiskInMenuBar && !relevant.isEmpty
+
+        if shouldShow {
+            if diskStatusItem == nil {
+                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                item.button?.setAccessibilityLabel("Velocidade dos discos")
+                item.menu = diskMenu
+                diskStatusItem = item
+            }
+            updateDiskStatusItem(relevant)
+        } else if diskStatusItem != nil {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if !(self.prefs.showDiskInMenuBar && !self.relevantDisks.isEmpty) {
+                    self.removeDiskStatusItem()
+                }
+            }
+        }
+    }
+
+    private func removeDiskStatusItem() {
+        guard let item = diskStatusItem else { return }
+        NSStatusBar.system.removeStatusItem(item)
+        diskStatusItem = nil
+    }
+
+    private func updateDiskStatusItem(_ relevant: [DiskInfo]) {
+        guard let button = diskStatusItem?.button else { return }
+
+        let read = relevant.reduce(0) { $0 + $1.readRate }
+        let write = relevant.reduce(0) { $0 + $1.writeRate }
+        let symbol = relevant.contains { !$0.isInternal } ? "externaldrive" : "internaldrive"
+
+        button.image = StatusCapsuleImage.make([
+            CapsuleSegment(
+                text: "R \(RateFormatting.rate(read))",
+                color: DiskFormatting.readColor,
+                symbolName: symbol
+            ),
+            CapsuleSegment(
+                text: "W \(RateFormatting.rate(write))",
+                color: DiskFormatting.writeColor,
+                symbolName: nil
+            )
+        ])
+        button.attributedTitle = NSAttributedString(string: "")
+        button.imagePosition = .imageOnly
+        button.toolTip = diskTooltip(relevant)
+        button.setAccessibilityValue(
+            "Leitura \(RateFormatting.rate(read)), escrita \(RateFormatting.rate(write))"
+        )
+    }
+
+    private func diskTooltip(_ relevant: [DiskInfo]) -> String {
+        let read = relevant.reduce(0) { $0 + $1.readRate }
+        let write = relevant.reduce(0) { $0 + $1.writeRate }
+        var lines = ["Discos — R \(RateFormatting.rate(read))  W \(RateFormatting.rate(write))"]
+        for disk in relevant {
+            lines.append(
+                "\(disk.name): R \(RateFormatting.rate(disk.readRate))  W \(RateFormatting.rate(disk.writeRate))"
+            )
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func rebuildDiskMenu() {
+        diskMenu.removeAllItems()
+        addDiskItems(to: diskMenu)
+        diskMenu.addItem(.separator())
+
+        let showItem = NSMenuItem(title: "Mostrar discos na barra", action: #selector(toggleShowDiskInBar), keyEquivalent: "")
+        showItem.target = self
+        showItem.state = prefs.showDiskInMenuBar ? .on : .off
+        diskMenu.addItem(showItem)
+
+        let internalItem = NSMenuItem(title: "Incluir disco interno na barra", action: #selector(toggleIncludeInternalDisk), keyEquivalent: "")
+        internalItem.target = self
+        internalItem.state = prefs.diskIncludeInternal ? .on : .off
+        diskMenu.addItem(internalItem)
+
+        let refreshItem = NSMenuItem(title: "Atualizar agora", action: #selector(refreshNow), keyEquivalent: "")
+        refreshItem.target = self
+        diskMenu.addItem(refreshItem)
+
+        diskMenu.addItem(.separator())
+
+        let updateItem = NSMenuItem(title: "Procurar atualizações…", action: #selector(checkForUpdatesMenu), keyEquivalent: "")
+        updateItem.target = self
+        diskMenu.addItem(updateItem)
+
+        let aboutItem = NSMenuItem(title: "Sobre o FanmacOS", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        diskMenu.addItem(aboutItem)
+
+        let quitItem = NSMenuItem(title: "Sair do FanmacOS", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        diskMenu.addItem(quitItem)
+        diskMenu.addItem(footerMenuItem())
+    }
+
+    @objc private func toggleShowDiskInBar() {
+        prefs.showDiskInMenuBar.toggle()
+        refreshDiskStatusItem()
+    }
+
+    @objc private func toggleIncludeInternalDisk() {
+        prefs.diskIncludeInternal.toggle()
+        refreshDiskStatusItem()
     }
 
     private func setupNetworkStatusItem() {

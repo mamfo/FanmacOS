@@ -14,6 +14,7 @@ App de barra de menus para macOS que mostra as temperaturas do hardware junto ao
 - Início automático ao iniciar sessão.
 - Ventoinhas: RPM em tempo real, velocidade manual por ventoinha, botão de máximo e regresso ao automático.
 - Rede: velocidade de receção (↓) e envio (↑), total e por interface, na barra e no menu, com cores distintas.
+- Discos: velocidade de leitura (R) e escrita (W) de cartões SD, pen USB e discos externos, com cápsulas na barra quando há mídia externa.
 - Atualizações automáticas via GitHub Releases.
 - Temperaturas sem root nem permissões; o controlo das ventoinhas é autorizado uma única vez com a palavra-passe de administrador.
 
@@ -56,9 +57,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-1.7.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-1.7.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-1.7.sha256` | somas de verificação |
+| `FanmacOS-1.8.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-1.8.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-1.8.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -108,6 +109,17 @@ O tráfego é lido localmente através de `sysctl(NET_RT_IFLIST2)`, que expõe c
 
 No menu aparecem os totais **↓ Receber** / **↑ Enviar** e um submenu **Interfaces** com cada placa. O segundo item da barra pode ser escondido em **Mostrar rede na barra**.
 
+### Discos
+
+As estatísticas vêm do `IOBlockStorageDriver` do IOKit (`Bytes (Read)` / `Bytes (Write)`), sem root. Cada disco físico é identificado pelo nome BSD (`disk4`, etc.) e os metadados (nome, protocolo USB/SD, interno/virtual) são lidos com `diskutil info -plist` apenas quando um disco aparece.
+
+- A barra mostra cápsulas **R** (leitura, azul-petróleo) e **W** (escrita, âmbar) com o total dos discos externos.
+- O item da barra aparece automaticamente quando ligas um cartão SD, pen USB ou disco externo e desaparece quando o retiras.
+- Em **Mostrar discos na barra** podes desligar o item; **Incluir disco interno na barra** acrescenta o SSD interno.
+- O menu **DISCOS** lista todos os discos físicos, incluindo o interno, com as velocidades de leitura/escrita.
+
+Discos virtuais (imagens `.dmg`, contentores APFS sintetizados) são ignorados.
+
 ### Ventoinhas
 
 A leitura de RPM usa as chaves `FNum`, `F{0}Ac`, `F{0}Mn`, `F{0}Mx`, `F{0}Tg` e `F{0}Md`/`F{0}md` do SMC — sem privilégios. O controlo manual escreve `F{0}Md = 1` e depois `F{0}Tg = rpm`; devolver ao automático escreve `F{0}Md = 0`. As velocidades são sempre limitadas ao mínimo e máximo reportados pelo hardware. Em modelos M3/M4+ o código tenta ainda o desbloqueio `Ftst` quando o firmware recusa o modo manual.
@@ -141,6 +153,7 @@ Sources/
   FanControlService.swift instalação e execução do assistente root
   FanWindow.swift         janela de controlo das ventoinhas
   NetworkMonitor.swift    contadores e velocidades de rede
+  DiskMonitor.swift       estatísticas de leitura/escrita dos discos
   UpdateService.swift     verificação, download e instalação de versões
   fanctl/main.swift       binário que corre como root
   AppInfo.swift            versão e autor (rodapé e Sobre)
