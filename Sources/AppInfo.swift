@@ -9,7 +9,7 @@ enum AppInfo {
     static let releasesURL = URL(string: "https://github.com/mamfo/FanmacOS/releases")!
 
     static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2"
     }
 
     static var footer: String {

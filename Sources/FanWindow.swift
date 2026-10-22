@@ -38,27 +38,59 @@ final class FanWindowController: NSWindowController {
     }
 
     private func placeWindow() {
-        guard let window else { return }
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
-            ?? NSScreen.main
-            ?? NSScreen.screens.first
-        guard let screen else { return }
+        guard let window, let screen = Self.preferredScreen() else { return }
 
-        let visible = screen.visibleFrame
-        let size = window.frame.size
         let displayNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         let displayID = CGDirectDisplayID(displayNumber?.uint32Value ?? 0)
         let isBuiltIn = displayID != 0 && CGDisplayIsBuiltin(displayID) != 0
 
-        window.setFrameOrigin(NSPoint(
-            x: Self.windowCenterX(visibleFrame: visible, isBuiltIn: isBuiltIn) - size.width / 2,
-            y: visible.midY - size.height / 2
+        window.setFrameOrigin(Self.windowOrigin(
+            visibleFrame: screen.visibleFrame,
+            notchLeft: screen.auxiliaryTopLeftArea?.maxX,
+            isBuiltIn: isBuiltIn,
+            windowSize: window.frame.size
         ))
     }
 
-    static func windowCenterX(visibleFrame: NSRect, isBuiltIn: Bool) -> CGFloat {
-        isBuiltIn ? visibleFrame.minX + visibleFrame.width * 0.33 : visibleFrame.midX
+    static func preferredScreen() -> NSScreen? {
+        if let notched = NSScreen.screens.first(where: { $0.auxiliaryTopLeftArea != nil }) {
+            return notched
+        }
+
+        if let builtIn = NSScreen.screens.first(where: { screen in
+            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                return false
+            }
+            return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) != 0
+        }) {
+            return builtIn
+        }
+
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+    }
+
+    static func windowOrigin(
+        visibleFrame: NSRect,
+        notchLeft: CGFloat?,
+        isBuiltIn: Bool,
+        windowSize: NSSize
+    ) -> NSPoint {
+        let margin: CGFloat = 12
+
+        if isBuiltIn || notchLeft != nil {
+            let rightLimit = notchLeft ?? (visibleFrame.midX - 40)
+            let x = max(visibleFrame.minX + margin, rightLimit - windowSize.width - margin)
+            let y = visibleFrame.maxY - windowSize.height - margin
+            return NSPoint(x: x, y: y)
+        }
+
+        return NSPoint(
+            x: visibleFrame.midX - windowSize.width / 2,
+            y: visibleFrame.midY - windowSize.height / 2
+        )
     }
 
     func setStatus(_ message: String) {

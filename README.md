@@ -58,9 +58,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.1.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.1.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.1.sha256` | somas de verificação |
+| `FanmacOS-2.2.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.2.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.2.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -134,7 +134,7 @@ Escrever no SMC exige root. Na primeira alteração manual, o FanmacOS pede auto
 
 O assistente pode ser removido em **menu → Remover assistente de ventoinhas…**, que também devolve as ventoinhas ao modo automático. Não há daemons, extensões de kernel nem processos residentes: o `fanctl` só corre quando é necessário.
 
-No ecrã integrado do MacBook, a janela de controlo abre à esquerda do centro, longe da webcam.
+No ecrã integrado do MacBook, a janela de controlo fica fixa ao lado esquerdo do notch/webcam (ancorada à área do notch).
 
 Por omissão, o app devolve as ventoinhas ao modo automático ao sair. Se o app for forçado a encerrar (crash ou Force Quit), a velocidade manual pode permanecer ativa até usar **Tudo automático** ou reiniciar o Mac. Após acordar de suspensão — ou se o macOS alterar a velocidade — as velocidades manuais guardadas são reaplicadas.
 
