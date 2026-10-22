@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let fanService = FanControlService()
     private let statusItem: NSStatusItem = {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.autosaveName = StatusItemPositioning.temperatureName
+        item.autosaveName = "FanmacOSTemperature"
         return item
     }()
     private let menu = NSMenu()

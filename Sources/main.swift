@@ -53,8 +53,6 @@ if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-
     exit(0)
 }
 
-StatusItemPositioning.apply()
-
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
