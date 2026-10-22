@@ -7,7 +7,7 @@ App de barra de menus para macOS que mostra as temperaturas do hardware junto ao
 ## Funcionalidades
 
 - Temperatura da CPU em tempo real na barra de menus, com ícone e cor por faixa (normal, morna, quente).
-- Cápsulas de largura fixa e 18 px de altura, para a barra não se deslocar quando os valores mudam.
+- Cápsulas de largura fixa e altura proporcional à barra (20–22 px), para a barra não se deslocar quando os valores mudam.
 - Menu com CPU (máxima e média), SSD/NAND, outros sensores e a lista completa de sensores.
 - Escolha do que mostrar na barra: CPU, máxima do sistema, SSD, sensor específico ou apenas o ícone.
 - Intervalo de atualização configurável (1, 2, 5, 10 ou 30 segundos).
@@ -58,9 +58,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.0.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.0.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.0.sha256` | somas de verificação |
+| `FanmacOS-2.1.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.1.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.1.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -133,6 +133,8 @@ Escrever no SMC exige root. Na primeira alteração manual, o FanmacOS pede auto
 | `/etc/sudoers.d/fanmacos` | regra que permite ao utilizador executar apenas esse assistente |
 
 O assistente pode ser removido em **menu → Remover assistente de ventoinhas…**, que também devolve as ventoinhas ao modo automático. Não há daemons, extensões de kernel nem processos residentes: o `fanctl` só corre quando é necessário.
+
+No ecrã integrado do MacBook, a janela de controlo abre à esquerda do centro, longe da webcam.
 
 Por omissão, o app devolve as ventoinhas ao modo automático ao sair. Se o app for forçado a encerrar (crash ou Force Quit), a velocidade manual pode permanecer ativa até usar **Tudo automático** ou reiniciar o Mac. Após acordar de suspensão — ou se o macOS alterar a velocidade — as velocidades manuais guardadas são reaplicadas.
 

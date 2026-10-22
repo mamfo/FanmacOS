@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 
 final class FanWindowController: NSWindowController {
     private let service = FanControlService()
@@ -43,12 +44,21 @@ final class FanWindowController: NSWindowController {
             ?? NSScreen.main
             ?? NSScreen.screens.first
         guard let screen else { return }
+
         let visible = screen.visibleFrame
         let size = window.frame.size
+        let displayNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        let displayID = CGDirectDisplayID(displayNumber?.uint32Value ?? 0)
+        let isBuiltIn = displayID != 0 && CGDisplayIsBuiltin(displayID) != 0
+
         window.setFrameOrigin(NSPoint(
-            x: visible.midX - size.width / 2,
+            x: Self.windowCenterX(visibleFrame: visible, isBuiltIn: isBuiltIn) - size.width / 2,
             y: visible.midY - size.height / 2
         ))
+    }
+
+    static func windowCenterX(visibleFrame: NSRect, isBuiltIn: Bool) -> CGFloat {
+        isBuiltIn ? visibleFrame.minX + visibleFrame.width * 0.33 : visibleFrame.midX
     }
 
     func setStatus(_ message: String) {

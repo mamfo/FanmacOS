@@ -208,8 +208,9 @@ enum StatusCapsuleImage {
             .font: capsuleFont,
             .foregroundColor: NSColor.white
         ]
-        let imageHeight: CGFloat = 18
-        let capsuleHeight: CGFloat = 18
+        let barThickness = NSStatusBar.system.thickness > 0 ? NSStatusBar.system.thickness : 22
+        let capsuleHeight = max(20, min(24, barThickness - 2))
+        let imageHeight = capsuleHeight
         let padding: CGFloat = 6
         let gap: CGFloat = 4
 
