@@ -1,7 +1,7 @@
 import Foundation
 
 enum FanControlBuild {
-    static let helperVersion = "1"
+    static let helperVersion = "2"
     static let helperDirectory = "/Library/FanmacOS"
     static let helperPath = "/Library/FanmacOS/fanctl"
     static let sudoersPath = "/etc/sudoers.d/fanmacos"

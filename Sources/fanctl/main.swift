@@ -1,5 +1,11 @@
 import Foundation
 
+var stopRequested: sig_atomic_t = 0
+
+func handleStopSignal(_ signalNumber: Int32) {
+    stopRequested = 1
+}
+
 func fail(_ message: String, code: Int32 = 1) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(code)
@@ -15,6 +21,7 @@ func usage() -> Never {
       fanctl set <rpm> [--fan N]
       fanctl max
       fanctl auto [--fan N]
+      fanctl watch <pasta-de-controlo>
 
     As operações de escrita são executadas como root.
     """)
@@ -90,6 +97,69 @@ do {
             try controller.setAutoAll()
             print("ventoinhas em automático")
         }
+
+    case "watch":
+        requireRoot()
+        guard let directory = arguments.dropFirst().first else {
+            fail("fanctl: uso: fanctl watch <pasta-de-controlo>")
+        }
+
+        signal(SIGTERM, handleStopSignal)
+        signal(SIGINT, handleStopSignal)
+
+        let targetPath = directory + "/target"
+        let heartbeatPath = directory + "/heartbeat"
+        let stopPath = directory + "/stop"
+        let controller = try FanController()
+
+        func restoreAutomatic() {
+            try? controller.setAutoAll()
+        }
+        defer { restoreAutomatic() }
+
+        var lastTarget = 0.0
+        var lastApply = Date.distantPast
+        var failures = 0
+
+        while stopRequested == 0 {
+            if FileManager.default.fileExists(atPath: stopPath) {
+                break
+            }
+
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: heartbeatPath),
+                  let heartbeat = attributes[.modificationDate] as? Date else {
+                Thread.sleep(forTimeInterval: 0.25)
+                continue
+            }
+
+            if Date().timeIntervalSince(heartbeat) > 20 {
+                break
+            }
+
+            if let data = FileManager.default.contents(atPath: targetPath),
+               let text = String(data: data, encoding: .utf8),
+               let target = Double(text.trimmingCharacters(in: .whitespacesAndNewlines)),
+               target > 0 {
+                let elapsed = Date().timeIntervalSince(lastApply)
+                if abs(target - lastTarget) > 25 || elapsed > 2 {
+                    do {
+                        try controller.setSpeedAll(rpm: target)
+                        lastTarget = target
+                        lastApply = Date()
+                        failures = 0
+                    } catch {
+                        failures += 1
+                        if failures >= 3 {
+                            break
+                        }
+                    }
+                }
+            }
+
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+
+        print("fanctl watch: a restaurar automático")
 
     case "help", "--help", "-h":
         usage()

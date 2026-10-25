@@ -19,7 +19,7 @@ test: build
 		Sources/SMC.swift Sources/FanControl.swift Sources/FanControlService.swift \
 		Sources/Preferences.swift Sources/AppInfo.swift Sources/Models.swift \
 		Sources/Formatting.swift Sources/NetworkMonitor.swift Sources/DiskMonitor.swift \
-		Sources/MetricsHistory.swift Sources/MenuViews.swift Sources/FanWindow.swift Sources/UpdateService.swift \
+		Sources/MetricsHistory.swift Sources/FanCurve.swift Sources/MenuViews.swift Sources/FanWindow.swift Sources/UpdateService.swift \
 		Tests/main.swift -o build/FanmacOSTests
 	./build/FanmacOSTests
 

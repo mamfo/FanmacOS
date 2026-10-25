@@ -13,10 +13,21 @@ final class FanWindowController: NSWindowController {
     private let maxButton = NSButton(title: "Máximo", target: nil, action: nil)
     private var restoreCheckbox: NSButton!
     private var isApplying = false
+    private var curveActive = false
+    private var isUpdatingCurve = false
+    private var curveCheckbox: NSButton!
+    private var curveStartSlider: NSSlider!
+    private var curveFullSlider: NSSlider!
+    private var curveStartLabel: NSTextField!
+    private var curveFullLabel: NSTextField!
+    private var curveStatusLabel: NSTextField!
+
+    var onCurveToggle: ((Bool) -> Void)?
+    var onCurveSettingsChanged: ((Double, Double) -> Void)?
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 540),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 760),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -97,6 +108,46 @@ final class FanWindowController: NSWindowController {
         statusLabel.stringValue = message
     }
 
+    func reloadCurvePreferences() {
+        guard curveCheckbox != nil else { return }
+        isUpdatingCurve = true
+        curveCheckbox.state = prefs.fanCurveEnabled ? .on : .off
+        let settings = FanCurve.normalizedSettings(start: prefs.fanCurveStart, full: prefs.fanCurveFull)
+        curveStartSlider.doubleValue = settings.start
+        curveFullSlider.doubleValue = settings.full
+        updateCurveLabels()
+        curveStatusLabel.stringValue = prefs.fanCurveEnabled ? "A preparar curva…" : "Curva desligada."
+        isUpdatingCurve = false
+    }
+
+    func setCurveStatus(active: Bool, target: Double?, temperature: Double?, message: String?) {
+        curveActive = active
+        isUpdatingCurve = true
+        curveCheckbox.state = prefs.fanCurveEnabled ? .on : .off
+        if let target {
+            var status = "Ativa · alvo \(FanCardView.rpmText(target))"
+            if let temperature {
+                status += String(format: " · CPU %.0f °C", temperature)
+            }
+            curveStatusLabel.stringValue = status
+        } else if let message {
+            curveStatusLabel.stringValue = message
+        } else {
+            curveStatusLabel.stringValue = active ? "Curva ativa." : "Curva desligada."
+        }
+        isUpdatingCurve = false
+
+        for card in cards {
+            card.setCurveActive(active)
+        }
+        maxButton.isEnabled = !fans.isEmpty && !active
+    }
+
+    private func updateCurveLabels() {
+        curveStartLabel.stringValue = String(format: "Início: %.0f °C", curveStartSlider.doubleValue)
+        curveFullLabel.stringValue = String(format: "Máximo: %.0f °C", curveFullSlider.doubleValue)
+    }
+
     func update(fans: [FanInfo]) {
         self.fans = fans
 
@@ -105,10 +156,13 @@ final class FanWindowController: NSWindowController {
         }
         for (card, fan) in zip(cards, fans) {
             card.setFan(fan)
+            if curveActive {
+                card.setCurveActive(true)
+            }
         }
 
         autoAllButton.isEnabled = !fans.isEmpty
-        maxButton.isEnabled = !fans.isEmpty
+        maxButton.isEnabled = !fans.isEmpty && !curveActive
         updateHelperLabel()
 
         if fans.isEmpty {
@@ -128,6 +182,56 @@ final class FanWindowController: NSWindowController {
         let subtitle = NSTextField(wrappingLabelWithString: "As ventoinhas seguem o macOS por omissão e voltam ao automático ao reiniciar.")
         subtitle.font = .systemFont(ofSize: 11)
         subtitle.textColor = .secondaryLabelColor
+
+        curveCheckbox = NSButton(
+            checkboxWithTitle: "Curva automática pela temperatura da CPU",
+            target: self,
+            action: #selector(curveToggled)
+        )
+        curveCheckbox.font = .systemFont(ofSize: 12, weight: .medium)
+        curveCheckbox.state = prefs.fanCurveEnabled ? .on : .off
+
+        let curveSettings = FanCurve.normalizedSettings(start: prefs.fanCurveStart, full: prefs.fanCurveFull)
+        curveStartLabel = NSTextField(labelWithString: "")
+        curveStartLabel.font = .systemFont(ofSize: 10.5)
+        curveStartLabel.textColor = .secondaryLabelColor
+        curveStartSlider = NSSlider(
+            value: curveSettings.start,
+            minValue: 30,
+            maxValue: 95,
+            target: self,
+            action: #selector(curveSliderChanged)
+        )
+        curveStartSlider.isContinuous = false
+
+        curveFullLabel = NSTextField(labelWithString: "")
+        curveFullLabel.font = .systemFont(ofSize: 10.5)
+        curveFullLabel.textColor = .secondaryLabelColor
+        curveFullSlider = NSSlider(
+            value: curveSettings.full,
+            minValue: 40,
+            maxValue: 105,
+            target: self,
+            action: #selector(curveSliderChanged)
+        )
+        curveFullSlider.isContinuous = false
+
+        curveStatusLabel = NSTextField(wrappingLabelWithString: "")
+        curveStatusLabel.font = .systemFont(ofSize: 10.5)
+        curveStatusLabel.textColor = .secondaryLabelColor
+        updateCurveLabels()
+
+        let curveStack = NSStackView(views: [
+            curveCheckbox,
+            curveStartLabel,
+            curveStartSlider,
+            curveFullLabel,
+            curveFullSlider,
+            curveStatusLabel
+        ])
+        curveStack.orientation = .vertical
+        curveStack.alignment = .leading
+        curveStack.spacing = 4
 
         helperLabel.font = .systemFont(ofSize: 10.5)
         helperLabel.textColor = .secondaryLabelColor
@@ -176,7 +280,17 @@ final class FanWindowController: NSWindowController {
         footer.textColor = .tertiaryLabelColor
         footer.alignment = .center
 
-        let outer = NSStackView(views: [title, subtitle, helperLabel, cardsStack, safety, statusLabel, buttons, footer])
+        let outer = NSStackView(views: [
+            title,
+            subtitle,
+            curveStack,
+            helperLabel,
+            cardsStack,
+            safety,
+            statusLabel,
+            buttons,
+            footer
+        ])
         outer.orientation = .vertical
         outer.alignment = .leading
         outer.spacing = 10
@@ -190,6 +304,10 @@ final class FanWindowController: NSWindowController {
             outer.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
             outer.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
             subtitle.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            curveStack.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            curveStartSlider.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            curveFullSlider.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            curveStatusLabel.widthAnchor.constraint(equalTo: outer.widthAnchor),
             helperLabel.widthAnchor.constraint(equalTo: outer.widthAnchor),
             cardsStack.widthAnchor.constraint(equalTo: outer.widthAnchor),
             safety.widthAnchor.constraint(equalTo: outer.widthAnchor),
@@ -216,19 +334,26 @@ final class FanWindowController: NSWindowController {
             }
             cardsStack.addArrangedSubview(card)
             card.widthAnchor.constraint(equalTo: cardsStack.widthAnchor).isActive = true
+            if curveActive {
+                card.setCurveActive(true)
+            }
             return card
         }
     }
 
     private func updateHelperLabel() {
-        if service.isInstalled {
+        if service.isReady {
             helperLabel.stringValue = "Assistente de ventoinhas instalado."
+        } else if service.isInstalled {
+            helperLabel.stringValue = "Assistente desatualizado; será atualizado na próxima alteração."
         } else {
             helperLabel.stringValue = "O controlo manual pede autorização de administrador uma vez."
         }
     }
 
     private func manualChanged(card: FanCardView, enabled: Bool) {
+        guard !curveActive else { return }
+
         guard enabled else {
             do {
                 if service.isInstalled {
@@ -252,7 +377,7 @@ final class FanWindowController: NSWindowController {
     }
 
     private func speedChanged(card: FanCardView, rpm: Double) {
-        guard card.isManualEnabled, !isApplying else { return }
+        guard !curveActive, card.isManualEnabled, !isApplying else { return }
         guard ensureHelper() else {
             card.setControls(manual: false, rpm: card.currentRPM)
             return
@@ -311,6 +436,14 @@ final class FanWindowController: NSWindowController {
     }
 
     @objc private func autoAll() {
+        if curveActive || prefs.fanCurveEnabled {
+            isUpdatingCurve = true
+            curveCheckbox.state = .off
+            isUpdatingCurve = false
+            onCurveToggle?(false)
+            return
+        }
+
         do {
             if service.isInstalled {
                 try service.setAutoAll()
@@ -326,6 +459,7 @@ final class FanWindowController: NSWindowController {
     }
 
     @objc private func maximum() {
+        guard !curveActive else { return }
         guard ensureHelper() else { return }
         do {
             try service.setMaximumAll()
@@ -337,6 +471,30 @@ final class FanWindowController: NSWindowController {
         } catch {
             statusLabel.stringValue = error.localizedDescription
         }
+    }
+
+    @objc private func curveToggled() {
+        guard !isUpdatingCurve else { return }
+        let enabled = curveCheckbox.state == .on
+        if enabled {
+            guard ensureHelper() else {
+                curveCheckbox.state = .off
+                return
+            }
+        }
+        onCurveToggle?(enabled)
+    }
+
+    @objc private func curveSliderChanged() {
+        guard !isUpdatingCurve else { return }
+        let settings = FanCurve.normalizedSettings(
+            start: curveStartSlider.doubleValue,
+            full: curveFullSlider.doubleValue
+        )
+        curveStartSlider.doubleValue = settings.start
+        curveFullSlider.doubleValue = settings.full
+        updateCurveLabels()
+        onCurveSettingsChanged?(settings.start, settings.full)
     }
 
     @objc private func toggleRestore() {
@@ -358,6 +516,7 @@ final class FanCardView: NSView {
     private(set) var maxRPM: Double = 0
     private var debounceWorkItem: DispatchWorkItem?
     private var lastAction = Date.distantPast
+    private var curveActive = false
 
     var onManualChange: ((Bool) -> Void)?
     var onSpeedChange: ((Double) -> Void)?
@@ -456,8 +615,6 @@ final class FanCardView: NSView {
 
         nameLabel.stringValue = "Ventoinha \(fan.index + 1)"
         rpmLabel.stringValue = Self.rpmText(fan.actualRPM)
-        modeLabel.stringValue = fan.manual ? "manual" : "automático"
-        modeLabel.textColor = fan.manual ? .systemOrange : .secondaryLabelColor
 
         let lower = fan.minRPM > 0 ? fan.minRPM : 1000
         let upper = max(fan.maxRPM, lower + 1)
@@ -465,12 +622,37 @@ final class FanCardView: NSView {
         slider.maxValue = upper
         rangeLabel.stringValue = "Intervalo: \(Self.rpmText(lower)) – \(Self.rpmText(upper))"
 
+        if curveActive {
+            manualSwitch.state = .off
+            manualSwitch.isEnabled = false
+            slider.isEnabled = false
+            modeLabel.stringValue = "curva"
+            modeLabel.textColor = .systemBlue
+            slider.doubleValue = Self.clamp(fan.targetRPM, lower, upper)
+            return
+        }
+
+        modeLabel.stringValue = fan.manual ? "manual" : "automático"
+        modeLabel.textColor = fan.manual ? .systemOrange : .secondaryLabelColor
+
         guard Date().timeIntervalSince(lastAction) > 3 else { return }
 
         manualSwitch.state = fan.manual ? .on : .off
         slider.isEnabled = fan.manual
         let value = fan.manual ? fan.targetRPM : fan.actualRPM
         slider.doubleValue = Self.clamp(value, lower, upper)
+    }
+
+    func setCurveActive(_ active: Bool) {
+        curveActive = active
+        manualSwitch.isEnabled = !active
+        switchLabel.textColor = active ? .tertiaryLabelColor : .secondaryLabelColor
+        if active {
+            manualSwitch.state = .off
+            slider.isEnabled = false
+            modeLabel.stringValue = "curva"
+            modeLabel.textColor = .systemBlue
+        }
     }
 
     func setControls(manual: Bool, rpm: Double) {
@@ -491,6 +673,7 @@ final class FanCardView: NSView {
     }
 
     @objc private func manualToggled() {
+        guard !curveActive else { return }
         lastAction = Date()
         let enabled = manualSwitch.state == .on
         slider.isEnabled = enabled
@@ -498,6 +681,7 @@ final class FanCardView: NSView {
     }
 
     @objc private func sliderChanged() {
+        guard !curveActive else { return }
         lastAction = Date()
         rangeLabel.stringValue = "Alvo: \(Self.rpmText(slider.doubleValue))"
 

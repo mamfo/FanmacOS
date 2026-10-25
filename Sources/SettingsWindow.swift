@@ -76,9 +76,11 @@ final class SettingsWindowController: NSWindowController {
         lowPowerCheckbox.state = prefs.lowPowerMode ? .on : .off
         restoreFansCheckbox.state = prefs.restoreFansOnQuit ? .on : .off
         autoUpdatesCheckbox.state = prefs.autoUpdates ? .on : .off
-        helperLabel.stringValue = fanService.isInstalled
+        helperLabel.stringValue = fanService.isReady
             ? "Assistente de ventoinhas instalado."
-            : "Assistente de ventoinhas não instalado."
+            : (fanService.isInstalled
+                ? "Assistente de ventoinhas desatualizado."
+                : "Assistente de ventoinhas não instalado.")
     }
 
     private func buildContent() {

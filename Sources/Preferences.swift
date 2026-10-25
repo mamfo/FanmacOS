@@ -47,6 +47,9 @@ final class Preferences {
         static let alertsEnabled = "temperatureAlertsEnabled"
         static let alertThreshold = "temperatureAlertThreshold"
         static let lowPowerMode = "lowPowerMode"
+        static let fanCurveEnabled = "fanCurveEnabled"
+        static let fanCurveStart = "fanCurveStartTemp"
+        static let fanCurveFull = "fanCurveFullTemp"
     }
 
     private let defaults = UserDefaults.standard
@@ -66,7 +69,10 @@ final class Preferences {
             Key.compactRates: false,
             Key.alertsEnabled: false,
             Key.alertThreshold: 92.0,
-            Key.lowPowerMode: true
+            Key.lowPowerMode: true,
+            Key.fanCurveEnabled: false,
+            Key.fanCurveStart: 55.0,
+            Key.fanCurveFull: 90.0
         ])
     }
 
@@ -194,5 +200,26 @@ final class Preferences {
             return defaults.bool(forKey: Key.lowPowerMode)
         }
         set { defaults.set(newValue, forKey: Key.lowPowerMode) }
+    }
+
+    var fanCurveEnabled: Bool {
+        get { defaults.bool(forKey: Key.fanCurveEnabled) }
+        set { defaults.set(newValue, forKey: Key.fanCurveEnabled) }
+    }
+
+    var fanCurveStart: Double {
+        get {
+            let value = defaults.double(forKey: Key.fanCurveStart)
+            return value > 0 ? value : 55
+        }
+        set { defaults.set(newValue, forKey: Key.fanCurveStart) }
+    }
+
+    var fanCurveFull: Double {
+        get {
+            let value = defaults.double(forKey: Key.fanCurveFull)
+            return value > 0 ? value : 90
+        }
+        set { defaults.set(newValue, forKey: Key.fanCurveFull) }
     }
 }

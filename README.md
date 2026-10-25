@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.6.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.6.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.6.sha256` | somas de verificação |
+| `FanmacOS-2.7.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.7.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.7.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -85,8 +85,8 @@ O código e os releases vivem em [github.com/mamfo/FanmacOS](https://github.com/
 
 Para publicar uma versão nova:
 
-1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `2.6`).
-2. Faz commit e cria a tag `v2.6`; envia-a para o GitHub.
+1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `2.8`).
+2. Faz commit e cria a tag `v2.8`; envia-a para o GitHub.
 3. O workflow `.github/workflows/release.yml` compila a app num runner macOS, gera DMG, ZIP e SHA-256 e cria o release automaticamente.
 
 A primeira instalação de uma versão com atualizador tem de ser feita manualmente (arrastar para Aplicações). A partir daí, as máquinas recebem as versões seguintes sem intervenção.
@@ -161,7 +161,13 @@ No ecrã integrado do MacBook, a janela de controlo fica fixa ao lado esquerdo d
 
 Por omissão, o app devolve as ventoinhas ao modo automático ao sair. Se o app for forçado a encerrar (crash ou Force Quit), a velocidade manual pode permanecer ativa até usar **Tudo automático** ou reiniciar o Mac. Após acordar de suspensão — ou se o macOS alterar a velocidade — as velocidades manuais guardadas são reaplicadas.
 
-> Aviso: o controlo manual é fornecido tal como está. O firmware da Apple continua a ter proteções térmicas, mas usa velocidades baixas com cautela.
+### Curva automática e watchdog
+
+Na janela das ventoinhas, **Curva automática pela temperatura da CPU** mapeia a temperatura (média de 3 leituras) entre **Início** e **Máximo** para a velocidade mínima/máxima das ventoinhas. A app escreve o alvo num ficheiro de controlo e inicia um processo root `fanctl watch`.
+
+O processo de vigilância aplica o alvo a cada 2 s e verifica um heartbeat da app. Se a app fechar inesperadamente (ou ficar sem heartbeat durante 20 s), ou se o Mac acordar de suspensão sem a app retomar, as ventoinhas voltam automaticamente ao controlo do macOS. Ao desligar a curva ou sair normalmente, a app também repõe o automático.
+
+> Aviso: o controlo manual/curva é fornecido tal como está. O firmware da Apple continua a ter proteções térmicas, mas usa velocidades baixas com cautela.
 
 ## Estrutura
 

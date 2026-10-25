@@ -93,6 +93,18 @@ check(csv.hasPrefix("timestamp,"), "CSV cabeçalho")
 check(csv.split(separator: "\n").count == 4, "CSV linhas")
 check(csv.contains("42.00"), "CSV valores")
 
+// Fan curve
+let curveMin = FanCurve.target(temperature: 40, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)
+let curveStart = FanCurve.target(temperature: 55, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)
+let curveMid = FanCurve.target(temperature: 72.5, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)
+let curveFull = FanCurve.target(temperature: 95, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)
+check(curveMin == 1100, "curva abaixo do início")
+check(curveStart == 1100, "curva no início")
+check(curveMid > 2200 && curveMid < 2400, "curva a meio")
+check(curveFull == 3500, "curva no máximo")
+let normalized = FanCurve.normalizedSettings(start: 90, full: 60)
+check(normalized.start == 90 && normalized.full > normalized.start, "curva normaliza limites")
+
 // Disk labels
 check(DiskKind.sdCard.label == "Cartão SD", "etiqueta cartão SD")
 check(DiskKind.usb.label == "USB", "etiqueta USB")

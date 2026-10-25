@@ -5,6 +5,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let prefs = Preferences.shared
     private let monitor = TemperatureMonitor()
     private let fanService = FanControlService()
+    private let fanCurveController = FanCurveController()
+    private var curveTemps: [Double] = []
+    private var curveTarget: Double?
+    private var curveError: String?
     private let statusItem: NSStatusItem = {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.autosaveName = "FanmacOSTemperature"
@@ -49,6 +53,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             prefs.clearManualTargets()
         }
         scheduleTimer()
+
+        fanCurveController.onExit = { [weak self] message in
+            guard let self else { return }
+            self.curveError = message
+            if self.prefs.fanCurveEnabled {
+                self.fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: message)
+            }
+        }
+
+        if prefs.fanCurveEnabled {
+            if fanService.isReady {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    self?.startFanCurve()
+                }
+            } else {
+                prefs.fanCurveEnabled = false
+            }
+        }
         scheduleUpdateChecks()
 
         if prefs.alertsEnabled {
@@ -68,6 +90,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 self?.reapplyManualFans()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                guard let self else { return }
+                if self.prefs.fanCurveEnabled,
+                   self.fanService.isReady,
+                   !self.fanCurveController.isRunning {
+                    self.startFanCurve()
+                }
             }
         }
     }
@@ -139,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         historyWindow?.update(history)
         refreshFans()
         superviseManualFans()
+        updateFanCurve()
         updateStatusItem()
         fanWindow?.update(fans: fans)
         if effectiveRefreshInterval != scheduledInterval {
@@ -147,6 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func superviseManualFans() {
+        guard !prefs.fanCurveEnabled else { return }
         let targets = prefs.manualFanTargets
         guard !targets.isEmpty, fanService.isInstalled else { return }
 
@@ -169,6 +201,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fans = fanController?.fans() ?? []
     }
 
+    private func startFanCurve() {
+        guard prefs.fanCurveEnabled else { return }
+        guard fanService.isReady else {
+            curveError = "Instala o assistente de ventoinhas para usar a curva."
+            fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: curveError)
+            return
+        }
+        guard !fanCurveController.isRunning else { return }
+
+        do {
+            try fanCurveController.start()
+            curveError = nil
+            curveTemps.removeAll()
+            prefs.clearManualTargets()
+        } catch {
+            curveError = error.localizedDescription
+            prefs.fanCurveEnabled = false
+            fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: curveError)
+        }
+    }
+
+    private func stopFanCurve() {
+        fanCurveController.stop()
+        curveTarget = nil
+        curveTemps.removeAll()
+        fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: "Curva desligada.")
+    }
+
+    private func updateFanCurve() {
+        guard prefs.fanCurveEnabled else { return }
+
+        guard fanService.isReady else {
+            fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: "Instala o assistente para usar a curva.")
+            return
+        }
+        guard fanCurveController.isRunning else {
+            fanWindow?.setCurveStatus(active: false, target: nil, temperature: nil, message: curveError ?? "Curva parada.")
+            return
+        }
+        guard let fan = fans.first,
+              fan.isControllable,
+              let temperature = snapshot.cpuMax ?? snapshot.systemMax else {
+            return
+        }
+
+        curveTemps.append(temperature)
+        if curveTemps.count > 3 {
+            curveTemps.removeFirst()
+        }
+        let average = curveTemps.reduce(0, +) / Double(curveTemps.count)
+        let target = FanCurve.target(
+            temperature: average,
+            start: prefs.fanCurveStart,
+            full: prefs.fanCurveFull,
+            minRPM: fan.minRPM,
+            maxRPM: fan.maxRPM
+        )
+        curveTarget = target
+        fanCurveController.update(target: target)
+        fanWindow?.setCurveStatus(active: true, target: target, temperature: average, message: nil)
+    }
+
     private func reapplyManualFans() {
         let targets = prefs.manualFanTargets
         guard !targets.isEmpty, fanService.isInstalled else { return }
@@ -179,6 +273,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        fanCurveController.stop()
+
         if isRelaunchingForUpdate { return .terminateNow }
         guard prefs.restoreFansOnQuit, fanService.isInstalled else { return .terminateNow }
         let manual = (fanController?.fans() ?? fans).contains { $0.manual }
@@ -693,12 +789,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         } else {
             for fan in fans {
+                let curve = prefs.fanCurveEnabled
+                let mode = curve ? "curva" : (fan.manual ? "manual" : "auto")
+                let color: NSColor = curve ? .systemBlue : (fan.manual ? .systemOrange : .secondaryLabelColor)
                 let view = SensorRowView(width: menu.minimumWidth - 8, valueWidth: 116)
                 view.configure(
                     name: "Ventoinha \(fan.index + 1)",
-                    value: "\(FanCardView.rpmText(fan.actualRPM)) · \(fan.manual ? "manual" : "auto")",
-                    dotColor: fan.manual ? .systemOrange : .secondaryLabelColor,
-                    valueColor: fan.manual ? .systemOrange : .secondaryLabelColor
+                    value: "\(FanCardView.rpmText(fan.actualRPM)) · \(mode)",
+                    dotColor: color,
+                    valueColor: color
                 )
                 let item = NSMenuItem()
                 item.view = view
@@ -721,8 +820,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openFanControl() {
         refreshFans()
         if fanWindow == nil {
-            fanWindow = FanWindowController()
+            let window = FanWindowController()
+            window.onCurveToggle = { [weak self] enabled in
+                guard let self else { return }
+                self.prefs.fanCurveEnabled = enabled
+                if enabled {
+                    self.startFanCurve()
+                } else {
+                    self.stopFanCurve()
+                }
+            }
+            window.onCurveSettingsChanged = { [weak self] start, full in
+                guard let self else { return }
+                self.prefs.fanCurveStart = start
+                self.prefs.fanCurveFull = full
+                self.updateFanCurve()
+            }
+            fanWindow = window
         }
+        fanWindow?.reloadCurvePreferences()
+        updateFanCurve()
         fanWindow?.update(fans: fans)
         fanWindow?.show()
     }
@@ -737,6 +854,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
+            if prefs.fanCurveEnabled {
+                prefs.fanCurveEnabled = false
+                stopFanCurve()
+            }
             try fanService.uninstall()
             prefs.clearManualTargets()
             refreshFans()
