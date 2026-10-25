@@ -53,6 +53,16 @@ if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-
     exit(0)
 }
 
+let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
+if !bundleIdentifier.isEmpty {
+    let otherInstances = NSRunningApplication
+        .runningApplications(withBundleIdentifier: bundleIdentifier)
+        .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+    if !otherInstances.isEmpty {
+        exit(0)
+    }
+}
+
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate

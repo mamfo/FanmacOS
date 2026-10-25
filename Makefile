@@ -1,6 +1,6 @@
 APP := build/FanmacOS.app
 
-.PHONY: build run dump icon dist install uninstall clean
+.PHONY: build test run dump icon dist install uninstall clean
 
 build:
 	./build.sh
@@ -13,6 +13,15 @@ run: build
 
 dump: build
 	$(APP)/Contents/MacOS/FanmacOS --dump
+
+test: build
+	swiftc -swift-version 5 -target arm64-apple-macos13.0 \
+		Sources/SMC.swift Sources/FanControl.swift Sources/FanControlService.swift \
+		Sources/Preferences.swift Sources/AppInfo.swift Sources/Models.swift \
+		Sources/Formatting.swift Sources/NetworkMonitor.swift Sources/DiskMonitor.swift \
+		Sources/MenuViews.swift Sources/FanWindow.swift Sources/UpdateService.swift \
+		Tests/main.swift -o build/FanmacOSTests
+	./build/FanmacOSTests
 
 dist: build
 	./scripts/make-dist.sh

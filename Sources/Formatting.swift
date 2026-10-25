@@ -83,6 +83,29 @@ enum RateFormatting {
         let number = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.\(digits)f", value)
         return "\(number) \(units[unit])"
     }
+
+    static func compact(_ bytesPerSecond: Double) -> String {
+        var value = (bytesPerSecond.isFinite ? bytesPerSecond : 0)
+        value = max(0, value)
+
+        let compactUnits = ["B", "K", "M", "G"]
+        var unit = 0
+        while value >= 1000, unit < compactUnits.count - 1 {
+            value /= 1000
+            unit += 1
+        }
+
+        if unit == 0 {
+            let rounded = Int(value.rounded())
+            if rounded >= 1000 { return "1,0K" }
+            return "\(rounded)B"
+        }
+
+        let digits = value >= 100 ? 0 : 1
+        let formatter = digits == 0 ? plainFormatter : decimalFormatter
+        let number = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.\(digits)f", value)
+        return "\(number)\(compactUnits[unit])"
+    }
 }
 
 enum NetworkFormatting {
@@ -199,6 +222,14 @@ enum StatusCapsuleImage {
         "212°F",
         "100°C",
         "-10°C"
+    ])
+    static let networkCompactTextWidth = measuredWidth([
+        "↓ 999,9M",
+        "↑ 999,9M"
+    ])
+    static let diskCompactTextWidth = measuredWidth([
+        "R 999,9M",
+        "W 999,9M"
     ])
 
     static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {

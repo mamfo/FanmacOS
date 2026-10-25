@@ -42,6 +42,10 @@ final class Preferences {
         static let autoUpdates = "autoUpdates"
         static let diskBar = "showDiskInMenuBar"
         static let diskInternal = "diskIncludeInternal"
+        static let showTemperature = "showTemperatureInMenuBar"
+        static let compactRates = "compactMenuBarRates"
+        static let alertsEnabled = "temperatureAlertsEnabled"
+        static let alertThreshold = "temperatureAlertThreshold"
     }
 
     private let defaults = UserDefaults.standard
@@ -56,7 +60,11 @@ final class Preferences {
             Key.networkBar: true,
             Key.autoUpdates: true,
             Key.diskBar: true,
-            Key.diskInternal: false
+            Key.diskInternal: false,
+            Key.showTemperature: true,
+            Key.compactRates: false,
+            Key.alertsEnabled: false,
+            Key.alertThreshold: 92.0
         ])
     }
 
@@ -150,5 +158,31 @@ final class Preferences {
     var diskIncludeInternal: Bool {
         get { defaults.bool(forKey: Key.diskInternal) }
         set { defaults.set(newValue, forKey: Key.diskInternal) }
+    }
+
+    var showTemperatureInMenuBar: Bool {
+        get {
+            if defaults.object(forKey: Key.showTemperature) == nil { return true }
+            return defaults.bool(forKey: Key.showTemperature)
+        }
+        set { defaults.set(newValue, forKey: Key.showTemperature) }
+    }
+
+    var compactRates: Bool {
+        get { defaults.bool(forKey: Key.compactRates) }
+        set { defaults.set(newValue, forKey: Key.compactRates) }
+    }
+
+    var alertsEnabled: Bool {
+        get { defaults.bool(forKey: Key.alertsEnabled) }
+        set { defaults.set(newValue, forKey: Key.alertsEnabled) }
+    }
+
+    var alertThreshold: Double {
+        get {
+            let value = defaults.double(forKey: Key.alertThreshold)
+            return value > 0 ? value : 92.0
+        }
+        set { defaults.set(newValue, forKey: Key.alertThreshold) }
     }
 }

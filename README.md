@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.4.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.4.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.4.sha256` | somas de verificação |
+| `FanmacOS-2.5.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.5.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.5.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -85,13 +85,23 @@ O código e os releases vivem em [github.com/mamfo/FanmacOS](https://github.com/
 
 Para publicar uma versão nova:
 
-1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `1.6`).
-2. Faz commit e cria a tag `v1.6`; envia-a para o GitHub.
+1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `2.6`).
+2. Faz commit e cria a tag `v2.6`; envia-a para o GitHub.
 3. O workflow `.github/workflows/release.yml` compila a app num runner macOS, gera DMG, ZIP e SHA-256 e cria o release automaticamente.
 
 A primeira instalação de uma versão com atualizador tem de ser feita manualmente (arrastar para Aplicações). A partir daí, as máquinas recebem as versões seguintes sem intervenção.
 
 > As atualizações são autenticadas por HTTPS, pela soma SHA-256 do release e pela verificação da assinatura do bundle. A app não é notarizada, por isso a primeira abertura continua a precisar de **Abrir** no menu de contexto.
+
+## Definições e testes
+
+Abre **Definições…** no menu (⌘,) para escolher os dados da barra, unidades, intervalo, alertas, ventoinhas e atualizações.
+
+```bash
+make test   # testes de lógica e geometria da interface
+```
+
+O CI corre os testes e a compilação; o workflow de release só publica se os testes passarem.
 
 ## Como funciona
 

@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let diskMonitor = DiskMonitor()
     private var diskSnapshot = DiskSnapshot.empty
     private let updateService = UpdateService()
+    private let alertManager = AlertManager()
+    private var settingsWindow: SettingsWindowController?
     private var availableUpdate: UpdateInfo?
     private var updateCheckTimer: Timer?
     private var isCheckingForUpdates = false
@@ -43,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         scheduleTimer()
         scheduleUpdateChecks()
+
+        if prefs.alertsEnabled {
+            alertManager.requestAuthorization()
+        }
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -100,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         snapshot = monitor.snapshot()
         networkSnapshot = networkMonitor.sample()
         diskSnapshot = diskMonitor.sample()
+        alertManager.evaluate(snapshot: snapshot)
         refreshFans()
         superviseManualFans()
         updateStatusItem()
@@ -166,61 +173,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             var segments: [CapsuleSegment] = []
             let disks = relevantDisks
+            let compact = prefs.compactRates
 
             if prefs.showDiskInMenuBar, !disks.isEmpty {
                 let read = disks.reduce(0) { $0 + $1.readRate }
                 let write = disks.reduce(0) { $0 + $1.writeRate }
                 let symbol = disks.contains { !$0.isInternal } ? "externaldrive" : "internaldrive"
+                let readText = compact ? RateFormatting.compact(read) : RateFormatting.rate(read)
+                let writeText = compact ? RateFormatting.compact(write) : RateFormatting.rate(write)
+                let width = compact ? StatusCapsuleImage.diskCompactTextWidth : StatusCapsuleImage.diskTextWidth
 
                 segments.append(CapsuleSegment(
-                    text: "R \(RateFormatting.rate(read))",
+                    text: "R \(readText)",
                     color: DiskFormatting.readColor,
                     symbolName: symbol,
-                    fixedTextWidth: StatusCapsuleImage.diskTextWidth
+                    fixedTextWidth: width
                 ))
                 segments.append(CapsuleSegment(
-                    text: "W \(RateFormatting.rate(write))",
+                    text: "W \(writeText)",
                     color: DiskFormatting.writeColor,
-                    fixedTextWidth: StatusCapsuleImage.diskTextWidth
+                    fixedTextWidth: width
                 ))
             }
 
             if prefs.showNetworkInMenuBar {
+                let downText = compact ? RateFormatting.compact(networkSnapshot.download) : NetworkFormatting.rate(networkSnapshot.download)
+                let upText = compact ? RateFormatting.compact(networkSnapshot.upload) : NetworkFormatting.rate(networkSnapshot.upload)
+                let width = compact ? StatusCapsuleImage.networkCompactTextWidth : StatusCapsuleImage.networkTextWidth
+
                 segments.append(CapsuleSegment(
-                    text: "↓ \(NetworkFormatting.rate(networkSnapshot.download))",
+                    text: "↓ \(downText)",
                     color: NetworkFormatting.downloadColor,
-                    fixedTextWidth: StatusCapsuleImage.networkTextWidth
+                    fixedTextWidth: width
                 ))
                 segments.append(CapsuleSegment(
-                    text: "↑ \(NetworkFormatting.rate(networkSnapshot.upload))",
+                    text: "↑ \(upText)",
                     color: NetworkFormatting.uploadColor,
-                    fixedTextWidth: StatusCapsuleImage.networkTextWidth
+                    fixedTextWidth: width
                 ))
             }
 
-            let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
-            segments.append(CapsuleSegment(
-                text: text,
-                color: color,
-                symbolName: prefs.showIcon ? "thermometer.medium" : nil,
-                fixedTextWidth: StatusCapsuleImage.temperatureTextWidth
-            ))
+            if prefs.showTemperatureInMenuBar {
+                let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
+                segments.append(CapsuleSegment(
+                    text: text,
+                    color: color,
+                    symbolName: prefs.showIcon ? "thermometer.medium" : nil,
+                    fixedTextWidth: StatusCapsuleImage.temperatureTextWidth
+                ))
+            }
 
-            let image = StatusCapsuleImage.make(segments)
-            button.image = image
-            button.attributedTitle = NSAttributedString(string: "")
-            button.imagePosition = .imageOnly
+            if segments.isEmpty {
+                button.image = statusImage()
+                button.attributedTitle = NSAttributedString(string: "")
+                button.imagePosition = .imageOnly
+            } else {
+                let image = StatusCapsuleImage.make(segments)
+                button.image = image
+                button.attributedTitle = NSAttributedString(string: "")
+                button.imagePosition = .imageOnly
 
-            if image == nil {
-                button.image = nil
-                button.attributedTitle = NSAttributedString(
-                    string: text,
-                    attributes: [
-                        .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-                        .foregroundColor: NSColor.labelColor
-                    ]
-                )
-                button.imagePosition = .noImage
+                if image == nil {
+                    button.image = nil
+                    button.attributedTitle = NSAttributedString(
+                        string: text,
+                        attributes: [
+                            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+                            .foregroundColor: NSColor.labelColor
+                        ]
+                    )
+                    button.imagePosition = .noImage
+                }
             }
         }
 
@@ -323,6 +346,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         iconItem.state = prefs.showIcon ? .on : .off
         menu.addItem(iconItem)
 
+        let temperatureBarItem = NSMenuItem(title: "Mostrar temperatura na barra", action: #selector(toggleTemperatureInBar), keyEquivalent: "")
+        temperatureBarItem.target = self
+        temperatureBarItem.state = prefs.showTemperatureInMenuBar ? .on : .off
+        menu.addItem(temperatureBarItem)
+
         let networkBarItem = NSMenuItem(title: "Mostrar rede na barra", action: #selector(toggleNetworkInBar), keyEquivalent: "")
         networkBarItem.target = self
         networkBarItem.state = prefs.showNetworkInMenuBar ? .on : .off
@@ -337,6 +365,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         internalDiskItem.target = self
         internalDiskItem.state = prefs.diskIncludeInternal ? .on : .off
         menu.addItem(internalDiskItem)
+
+        let compactItem = NSMenuItem(title: "Valores compactos (K/M/G)", action: #selector(toggleCompactRates), keyEquivalent: "")
+        compactItem.target = self
+        compactItem.state = prefs.compactRates ? .on : .off
+        menu.addItem(compactItem)
 
         let unitItem = NSMenuItem(title: "Mostrar em Fahrenheit", action: #selector(toggleFahrenheit), keyEquivalent: "")
         unitItem.target = self
@@ -354,6 +387,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autoUpdateItem.target = self
         autoUpdateItem.state = prefs.autoUpdates ? .on : .off
         menu.addItem(autoUpdateItem)
+
+        let alertsItem = NSMenuItem(title: "Alertas de temperatura", action: #selector(toggleTemperatureAlerts), keyEquivalent: "")
+        alertsItem.target = self
+        alertsItem.state = prefs.alertsEnabled ? .on : .off
+        menu.addItem(alertsItem)
 
         let refreshItem = NSMenuItem(title: "Atualizar agora", action: #selector(refreshNow), keyEquivalent: "r")
         refreshItem.target = self
@@ -386,6 +424,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+
+        let settingsItem = NSMenuItem(title: "Definições…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         let aboutItem = NSMenuItem(title: "Sobre o FanmacOS", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
@@ -492,19 +534,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return result
     }
 
+    @objc private func toggleTemperatureInBar() {
+        prefs.showTemperatureInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
     @objc private func toggleShowDiskInBar() {
         prefs.showDiskInMenuBar.toggle()
         updateStatusItem()
+        settingsWindow?.reload()
     }
 
     @objc private func toggleIncludeInternalDisk() {
         prefs.diskIncludeInternal.toggle()
         updateStatusItem()
+        settingsWindow?.reload()
+    }
+
+    @objc private func toggleCompactRates() {
+        prefs.compactRates.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
+    @objc private func toggleTemperatureAlerts() {
+        prefs.alertsEnabled.toggle()
+        if prefs.alertsEnabled {
+            alertManager.requestAuthorization()
+        }
+        settingsWindow?.reload()
     }
 
     @objc private func toggleNetworkInBar() {
         prefs.showNetworkInMenuBar.toggle()
         updateStatusItem()
+        settingsWindow?.reload()
     }
 
     private func rowItem(name: String, celsius: Double?, width: CGFloat? = nil, bold: Bool = false) -> NSMenuItem {
@@ -912,6 +977,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleAutoUpdates() {
         prefs.autoUpdates.toggle()
+        settingsWindow?.reload()
+    }
+
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let controller = SettingsWindowController()
+            controller.onChange = { [weak self] in
+                self?.scheduleTimer()
+                self?.updateStatusItem()
+            }
+            controller.onOpenFans = { [weak self] in
+                self?.openFanControl()
+            }
+            controller.onCheckUpdates = { [weak self] in
+                self?.checkForUpdatesMenu()
+            }
+            controller.onEnableAlerts = { [weak self] in
+                self?.alertManager.requestAuthorization()
+            }
+            settingsWindow = controller
+        }
+        settingsWindow?.show()
     }
 
     @objc private func quit() {

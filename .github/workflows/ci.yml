@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test and build
+        run: |
+          chmod +x build.sh scripts/build-icon.sh scripts/make-dist.sh
+          make test
+          ./build.sh

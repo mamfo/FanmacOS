@@ -25,9 +25,10 @@ jobs:
             exit 1
           fi
 
-      - name: Build and package
+      - name: Test, build and package
         run: |
           chmod +x build.sh scripts/build-icon.sh scripts/make-dist.sh
+          make test
           make dist
 
       - name: Publish release

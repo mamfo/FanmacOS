@@ -30,8 +30,18 @@ struct SensorSample: Hashable {
     let group: SensorGroup
 
     var displayName: String {
+        if name.hasPrefix("PMU tdie") {
+            return name.replacingOccurrences(of: "PMU tdie", with: "CPU · die ")
+        }
+        if name.hasPrefix("PMU tdev") {
+            return name.replacingOccurrences(of: "PMU tdev", with: "Placa · sensor ")
+        }
+        if name.hasPrefix("PMU TP") {
+            return name.replacingOccurrences(of: "PMU TP", with: "CPU · núcleo ")
+        }
         if group == .storage, name.hasPrefix("NAND") {
-            return name.replacingOccurrences(of: " temp", with: "")
+            let cleaned = name.replacingOccurrences(of: " temp", with: "")
+            return cleaned.replacingOccurrences(of: "NAND", with: "SSD · NAND")
         }
         return name
     }
