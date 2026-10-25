@@ -358,6 +358,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 ))
             }
 
+            if prefs.showCPUInMenuBar, let cpu = energySnapshot.cpuLoad {
+                segments.append(CapsuleSegment(
+                    text: String(format: "%.0f%%", cpu),
+                    color: UsageStyle.cpuColor,
+                    symbolName: UsageStyle.cpuSymbol,
+                    fixedTextWidth: StatusCapsuleImage.usageTextWidth
+                ))
+            }
+
+            if prefs.showRAMInMenuBar, let memory = energySnapshot.memoryUsage {
+                segments.append(CapsuleSegment(
+                    text: String(format: "%.0f%%", memory),
+                    color: UsageStyle.ramColor,
+                    symbolName: UsageStyle.ramSymbol,
+                    fixedTextWidth: StatusCapsuleImage.usageTextWidth
+                ))
+            }
+
             if prefs.showTemperatureInMenuBar {
                 let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
                 segments.append(CapsuleSegment(
@@ -507,6 +525,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         powerBarItem.target = self
         powerBarItem.state = prefs.showPowerInMenuBar ? .on : .off
         menu.addItem(powerBarItem)
+
+        let cpuBarItem = NSMenuItem(title: "Mostrar CPU na barra", action: #selector(toggleCPUInBar), keyEquivalent: "")
+        cpuBarItem.target = self
+        cpuBarItem.state = prefs.showCPUInMenuBar ? .on : .off
+        menu.addItem(cpuBarItem)
+
+        let ramBarItem = NSMenuItem(title: "Mostrar RAM na barra", action: #selector(toggleRAMInBar), keyEquivalent: "")
+        ramBarItem.target = self
+        ramBarItem.state = prefs.showRAMInMenuBar ? .on : .off
+        menu.addItem(ramBarItem)
 
         let networkBarItem = NSMenuItem(title: "Mostrar rede na barra", action: #selector(toggleNetworkInBar), keyEquivalent: "")
         networkBarItem.target = self
@@ -713,6 +741,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsWindow?.reload()
     }
 
+    @objc private func toggleCPUInBar() {
+        prefs.showCPUInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
+    @objc private func toggleRAMInBar() {
+        prefs.showRAMInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
     @objc private func toggleShowDiskInBar() {
         prefs.showDiskInMenuBar.toggle()
         updateStatusItem()
@@ -763,10 +803,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         target.addItem(sectionHeader("Energia"))
 
         if let cpu = energySnapshot.cpuLoad {
-            target.addItem(energyRow(name: "CPU uso", value: String(format: "%.0f %%", cpu), color: .systemBlue))
+            target.addItem(energyRow(name: "CPU uso", value: String(format: "%.0f %%", cpu), color: UsageStyle.cpuColor))
         }
         if let gpu = energySnapshot.gpuLoad {
             target.addItem(energyRow(name: "GPU uso", value: String(format: "%.0f %%", gpu), color: .systemPurple))
+        }
+        if let memory = energySnapshot.memoryUsage {
+            target.addItem(energyRow(name: "RAM uso", value: String(format: "%.0f %%", memory), color: UsageStyle.ramColor))
         }
         if let watts = energySnapshot.systemWatts {
             target.addItem(energyRow(name: "Consumo", value: PowerStyle.text(watts), color: PowerStyle.color))

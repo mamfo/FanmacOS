@@ -95,6 +95,9 @@ check(csv.contains("42.00"), "CSV valores")
 
 // Battery and power bar
 check(StatusCapsuleImage.batteryTextWidth > 0, "largura da bateria fixa")
+check(StatusCapsuleImage.usageTextWidth > 0, "largura do uso fixa")
+check(UsageStyle.cpuSymbol == "cpu", "símbolo CPU")
+check(UsageStyle.ramSymbol == "memorychip", "símbolo RAM")
 check(StatusCapsuleImage.powerTextWidth > 0, "largura do consumo fixa")
 check(PowerStyle.text(9.3).hasSuffix("W"), "texto de consumo")
 check(BatteryStyle.symbolName == "battery.100", "símbolo da bateria")

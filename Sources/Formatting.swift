@@ -145,6 +145,13 @@ enum NetworkFormatting {
     }
 }
 
+enum UsageStyle {
+    static let cpuColor = NSColor(srgbRed: 0.30, green: 0.36, blue: 0.90, alpha: 1)
+    static let ramColor = NSColor(srgbRed: 0.55, green: 0.20, blue: 0.80, alpha: 1)
+    static let cpuSymbol = "cpu"
+    static let ramSymbol = "memorychip"
+}
+
 enum PowerStyle {
     static let symbolName = "bolt.fill"
     static let color = NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1)
@@ -270,6 +277,10 @@ enum StatusCapsuleImage {
     static let powerTextWidth = measuredWidth([
         "999,9 W",
         "100 W"
+    ])
+    static let usageTextWidth = measuredWidth([
+        "100%",
+        "8%"
     ])
 
     static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {

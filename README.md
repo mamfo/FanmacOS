@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.9.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.9.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.9.sha256` | somas de verificação |
+| `FanmacOS-2.10.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.10.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.10.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -104,6 +104,8 @@ A amostragem é feita ao mesmo ritmo das leituras; o histórico fica só em mem�
 O menu **Energia** mostra a carga da CPU e GPU. Em Macs com bateria mostra também percentagem, temperatura, saúde, ciclos, estado de carga e potência do carregador. Em Macs sem bateria (ou ambientes virtualizados) a secção da bateria é omitida.
 
 **Mostrar bateria na barra** acrescenta uma cápsula com ícone e percentagem, colorida por nível (verde ≥50%, laranja 20–49%, vermelho <20%) e verde enquanto carrega.
+
+**Mostrar CPU na barra** e **Mostrar RAM na barra** acrescentam as percentagens de utilização, com os símbolos `cpu` e `memorychip`. A RAM é calculada a partir das páginas ativas, wired e comprimidas. Podes desligar qualquer métrica para manter a barra compacta.
 
 Em Macs fixos (sem bateria), o consumo total do sistema é lido do SMC (`PSTR`, com fallback `PDTR`) e aparece no menu **Energia** e na barra como **W** com um raio. A opção **Mostrar consumo na barra** controla a cápsula.
 

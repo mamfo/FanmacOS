@@ -52,6 +52,8 @@ final class Preferences {
         static let fanCurveFull = "fanCurveFullTemp"
         static let showBattery = "showBatteryInMenuBar"
         static let showPower = "showPowerInMenuBar"
+        static let showCPU = "showCPUInMenuBar"
+        static let showRAM = "showRAMInMenuBar"
     }
 
     private let defaults = UserDefaults.standard
@@ -76,7 +78,9 @@ final class Preferences {
             Key.fanCurveStart: 55.0,
             Key.fanCurveFull: 90.0,
             Key.showBattery: true,
-            Key.showPower: true
+            Key.showPower: true,
+            Key.showCPU: true,
+            Key.showRAM: true
         ])
     }
 
@@ -241,5 +245,21 @@ final class Preferences {
             return defaults.bool(forKey: Key.showPower)
         }
         set { defaults.set(newValue, forKey: Key.showPower) }
+    }
+
+    var showCPUInMenuBar: Bool {
+        get {
+            if defaults.object(forKey: Key.showCPU) == nil { return true }
+            return defaults.bool(forKey: Key.showCPU)
+        }
+        set { defaults.set(newValue, forKey: Key.showCPU) }
+    }
+
+    var showRAMInMenuBar: Bool {
+        get {
+            if defaults.object(forKey: Key.showRAM) == nil { return true }
+            return defaults.bool(forKey: Key.showRAM)
+        }
+        set { defaults.set(newValue, forKey: Key.showRAM) }
     }
 }

@@ -15,6 +15,7 @@ struct BatteryInfo {
 struct EnergySnapshot {
     let cpuLoad: Double?
     let gpuLoad: Double?
+    let memoryUsage: Double?
     let systemWatts: Double?
     let battery: BatteryInfo?
     let isOnBattery: Bool
@@ -23,6 +24,7 @@ struct EnergySnapshot {
     static let empty = EnergySnapshot(
         cpuLoad: nil,
         gpuLoad: nil,
+        memoryUsage: nil,
         systemWatts: nil,
         battery: nil,
         isOnBattery: false,
@@ -50,11 +52,36 @@ final class PowerMonitor {
         return EnergySnapshot(
             cpuLoad: readCPULoad(),
             gpuLoad: readGPULoad(),
+            memoryUsage: readMemoryUsage(),
             systemWatts: readSystemWatts(),
             battery: battery,
             isOnBattery: battery.map { !$0.externalPower } ?? false,
             date: Date()
         )
+    }
+
+    private func readMemoryUsage() -> Double? {
+        var statistics = vm_statistics64()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size
+        )
+        let result = withUnsafeMutablePointer(to: &statistics) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, rebound, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+
+        var pageSize: vm_size_t = 0
+        host_page_size(mach_host_self(), &pageSize)
+        let page = UInt64(pageSize > 0 ? pageSize : 4096)
+        let total = ProcessInfo.processInfo.physicalMemory
+        guard total > 0 else { return nil }
+
+        let used = (UInt64(statistics.active_count)
+            + UInt64(statistics.wire_count)
+            + UInt64(statistics.compressor_page_count)) * page
+        return min(100, max(0, Double(used) / Double(total) * 100))
     }
 
     private func readSystemWatts() -> Double? {
