@@ -145,6 +145,20 @@ enum NetworkFormatting {
     }
 }
 
+enum PowerStyle {
+    static let symbolName = "bolt.fill"
+    static let color = NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1)
+
+    static func text(_ watts: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = watts < 100 ? 1 : 0
+        formatter.maximumFractionDigits = watts < 100 ? 1 : 0
+        let number = formatter.string(from: NSNumber(value: watts)) ?? String(format: "%.1f", watts)
+        return "\(number) W"
+    }
+}
+
 enum BatteryStyle {
     static let symbolName = "battery.100"
 
@@ -252,6 +266,10 @@ enum StatusCapsuleImage {
     static let batteryTextWidth = measuredWidth([
         "100%",
         "8%"
+    ])
+    static let powerTextWidth = measuredWidth([
+        "999,9 W",
+        "100 W"
     ])
 
     static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {

@@ -15,11 +15,19 @@ struct BatteryInfo {
 struct EnergySnapshot {
     let cpuLoad: Double?
     let gpuLoad: Double?
+    let systemWatts: Double?
     let battery: BatteryInfo?
     let isOnBattery: Bool
     let date: Date
 
-    static let empty = EnergySnapshot(cpuLoad: nil, gpuLoad: nil, battery: nil, isOnBattery: false, date: .distantPast)
+    static let empty = EnergySnapshot(
+        cpuLoad: nil,
+        gpuLoad: nil,
+        systemWatts: nil,
+        battery: nil,
+        isOnBattery: false,
+        date: .distantPast
+    )
 }
 
 final class PowerMonitor {
@@ -35,16 +43,28 @@ final class PowerMonitor {
 
     private var previousTicks: [CPUTicks] = []
     private var hasPreviousTicks = false
+    private let smc = try? SMCConnection()
 
     func sample() -> EnergySnapshot {
         let battery = readBattery()
         return EnergySnapshot(
             cpuLoad: readCPULoad(),
             gpuLoad: readGPULoad(),
+            systemWatts: readSystemWatts(),
             battery: battery,
             isOnBattery: battery.map { !$0.externalPower } ?? false,
             date: Date()
         )
+    }
+
+    private func readSystemWatts() -> Double? {
+        guard let smc else { return nil }
+        for key in ["PSTR", "PDTR"] {
+            if let value = try? smc.readNumber(key), value > 0, value < 2000 {
+                return value
+            }
+        }
+        return nil
     }
 
     private func readCPULoad() -> Double? {

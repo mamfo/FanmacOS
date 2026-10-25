@@ -12,6 +12,7 @@ final class SettingsWindowController: NSWindowController {
 
     private var temperatureCheckbox: NSButton!
     private var batteryCheckbox: NSButton!
+    private var powerCheckbox: NSButton!
     private var networkCheckbox: NSButton!
     private var diskCheckbox: NSButton!
     private var compactCheckbox: NSButton!
@@ -66,6 +67,7 @@ final class SettingsWindowController: NSWindowController {
 
         temperatureCheckbox.state = prefs.showTemperatureInMenuBar ? .on : .off
         batteryCheckbox.state = prefs.showBatteryInMenuBar ? .on : .off
+        powerCheckbox.state = prefs.showPowerInMenuBar ? .on : .off
         networkCheckbox.state = prefs.showNetworkInMenuBar ? .on : .off
         diskCheckbox.state = prefs.showDiskInMenuBar ? .on : .off
         compactCheckbox.state = prefs.compactRates ? .on : .off
@@ -102,6 +104,7 @@ final class SettingsWindowController: NSWindowController {
 
         temperatureCheckbox = checkbox("Mostrar temperatura na barra", action: #selector(changed))
         batteryCheckbox = checkbox("Mostrar bateria na barra", action: #selector(changed))
+        powerCheckbox = checkbox("Mostrar consumo na barra (sem bateria)", action: #selector(changed))
         networkCheckbox = checkbox("Mostrar rede na barra", action: #selector(changed))
         diskCheckbox = checkbox("Mostrar discos na barra", action: #selector(changed))
         compactCheckbox = checkbox("Valores compactos (K/M/G)", action: #selector(changed))
@@ -156,6 +159,7 @@ final class SettingsWindowController: NSWindowController {
             section("BARRA DE MENUS"),
             temperatureCheckbox,
             batteryCheckbox,
+            powerCheckbox,
             networkCheckbox,
             diskCheckbox,
             compactCheckbox,
@@ -237,6 +241,7 @@ final class SettingsWindowController: NSWindowController {
         prefs.showTemperatureInMenuBar = temperatureCheckbox.state == .on
         prefs.showNetworkInMenuBar = networkCheckbox.state == .on
         prefs.showBatteryInMenuBar = batteryCheckbox.state == .on
+        prefs.showPowerInMenuBar = powerCheckbox.state == .on
         prefs.showDiskInMenuBar = diskCheckbox.state == .on
         prefs.compactRates = compactCheckbox.state == .on
         prefs.showIcon = iconCheckbox.state == .on

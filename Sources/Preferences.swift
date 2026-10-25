@@ -51,6 +51,7 @@ final class Preferences {
         static let fanCurveStart = "fanCurveStartTemp"
         static let fanCurveFull = "fanCurveFullTemp"
         static let showBattery = "showBatteryInMenuBar"
+        static let showPower = "showPowerInMenuBar"
     }
 
     private let defaults = UserDefaults.standard
@@ -74,7 +75,8 @@ final class Preferences {
             Key.fanCurveEnabled: false,
             Key.fanCurveStart: 55.0,
             Key.fanCurveFull: 90.0,
-            Key.showBattery: true
+            Key.showBattery: true,
+            Key.showPower: true
         ])
     }
 
@@ -231,5 +233,13 @@ final class Preferences {
             return defaults.bool(forKey: Key.showBattery)
         }
         set { defaults.set(newValue, forKey: Key.showBattery) }
+    }
+
+    var showPowerInMenuBar: Bool {
+        get {
+            if defaults.object(forKey: Key.showPower) == nil { return true }
+            return defaults.bool(forKey: Key.showPower)
+        }
+        set { defaults.set(newValue, forKey: Key.showPower) }
     }
 }

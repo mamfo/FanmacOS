@@ -93,8 +93,10 @@ check(csv.hasPrefix("timestamp,"), "CSV cabeçalho")
 check(csv.split(separator: "\n").count == 4, "CSV linhas")
 check(csv.contains("42.00"), "CSV valores")
 
-// Battery bar
+// Battery and power bar
 check(StatusCapsuleImage.batteryTextWidth > 0, "largura da bateria fixa")
+check(StatusCapsuleImage.powerTextWidth > 0, "largura do consumo fixa")
+check(PowerStyle.text(9.3).hasSuffix("W"), "texto de consumo")
 check(BatteryStyle.symbolName == "battery.100", "símbolo da bateria")
 check(BatteryStyle.color(percentage: 80, charging: false) != BatteryStyle.color(percentage: 10, charging: false), "cor da bateria por nível")
 

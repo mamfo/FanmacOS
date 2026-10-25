@@ -349,6 +349,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     symbolName: BatteryStyle.symbolName,
                     fixedTextWidth: StatusCapsuleImage.batteryTextWidth
                 ))
+            } else if prefs.showPowerInMenuBar, let watts = energySnapshot.systemWatts {
+                segments.append(CapsuleSegment(
+                    text: PowerStyle.text(watts),
+                    color: PowerStyle.color,
+                    symbolName: PowerStyle.symbolName,
+                    fixedTextWidth: StatusCapsuleImage.powerTextWidth
+                ))
             }
 
             if prefs.showTemperatureInMenuBar {
@@ -495,6 +502,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         batteryBarItem.target = self
         batteryBarItem.state = prefs.showBatteryInMenuBar ? .on : .off
         menu.addItem(batteryBarItem)
+
+        let powerBarItem = NSMenuItem(title: "Mostrar consumo na barra", action: #selector(togglePowerInBar), keyEquivalent: "")
+        powerBarItem.target = self
+        powerBarItem.state = prefs.showPowerInMenuBar ? .on : .off
+        menu.addItem(powerBarItem)
 
         let networkBarItem = NSMenuItem(title: "Mostrar rede na barra", action: #selector(toggleNetworkInBar), keyEquivalent: "")
         networkBarItem.target = self
@@ -695,6 +707,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsWindow?.reload()
     }
 
+    @objc private func togglePowerInBar() {
+        prefs.showPowerInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
     @objc private func toggleShowDiskInBar() {
         prefs.showDiskInMenuBar.toggle()
         updateStatusItem()
@@ -750,6 +768,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let gpu = energySnapshot.gpuLoad {
             target.addItem(energyRow(name: "GPU uso", value: String(format: "%.0f %%", gpu), color: .systemPurple))
         }
+        if let watts = energySnapshot.systemWatts {
+            target.addItem(energyRow(name: "Consumo", value: PowerStyle.text(watts), color: PowerStyle.color))
+        }
 
         if let battery = energySnapshot.battery {
             var batteryValue = "\(battery.percentage) %"
@@ -786,7 +807,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             target.addItem(energyRow(name: "Energia", value: powerValue, color: powerColor))
         }
 
-        if energySnapshot.cpuLoad == nil, energySnapshot.gpuLoad == nil, energySnapshot.battery == nil {
+        if energySnapshot.cpuLoad == nil, energySnapshot.gpuLoad == nil, energySnapshot.systemWatts == nil, energySnapshot.battery == nil {
             let item = NSMenuItem(title: "Sem dados de energia", action: nil, keyEquivalent: "")
             item.isEnabled = false
             target.addItem(item)
