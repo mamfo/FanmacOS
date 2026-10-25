@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.5.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.5.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.5.sha256` | somas de verificação |
+| `FanmacOS-2.6.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.6.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.6.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -92,6 +92,18 @@ Para publicar uma versão nova:
 A primeira instalação de uma versão com atualizador tem de ser feita manualmente (arrastar para Aplicações). A partir daí, as máquinas recebem as versões seguintes sem intervenção.
 
 > As atualizações são autenticadas por HTTPS, pela soma SHA-256 do release e pela verificação da assinatura do bundle. A app não é notarizada, por isso a primeira abertura continua a precisar de **Abrir** no menu de contexto.
+
+## Histórico
+
+**Histórico…** no menu abre gráficos dos últimos 15 minutos de temperatura, rede e discos. O botão **Exportar CSV…** grava os dados em CSV para análise.
+
+A amostragem é feita ao mesmo ritmo das leituras; o histórico fica só em memória e não sai do Mac.
+
+## Energia
+
+O menu **Energia** mostra a carga da CPU e GPU. Em Macs com bateria mostra também percentagem, temperatura, saúde, ciclos, estado de carga e potência do carregador. Em Macs sem bateria (ou ambientes virtualizados) a secção da bateria é omitida.
+
+**Poupar energia a baterias** (nas Definições) aumenta o intervalo para pelo menos 5 s quando estás a baterias.
 
 ## Definições e testes
 

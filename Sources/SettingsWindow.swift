@@ -7,6 +7,7 @@ final class SettingsWindowController: NSWindowController {
     var onChange: (() -> Void)?
     var onOpenFans: (() -> Void)?
     var onCheckUpdates: (() -> Void)?
+    var onOpenHistory: (() -> Void)?
     var onEnableAlerts: (() -> Void)?
 
     private var temperatureCheckbox: NSButton!
@@ -19,6 +20,7 @@ final class SettingsWindowController: NSWindowController {
     private var alertsCheckbox: NSButton!
     private var thresholdSlider: NSSlider!
     private var thresholdLabel: NSTextField!
+    private var lowPowerCheckbox: NSButton!
     private var restoreFansCheckbox: NSButton!
     private var autoUpdatesCheckbox: NSButton!
     private var helperLabel: NSTextField!
@@ -27,7 +29,7 @@ final class SettingsWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 860),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -71,6 +73,7 @@ final class SettingsWindowController: NSWindowController {
         alertsCheckbox.state = prefs.alertsEnabled ? .on : .off
         thresholdSlider.doubleValue = prefs.alertThreshold
         thresholdLabel.stringValue = String(format: "Limite: %.0f °C", prefs.alertThreshold)
+        lowPowerCheckbox.state = prefs.lowPowerMode ? .on : .off
         restoreFansCheckbox.state = prefs.restoreFansOnQuit ? .on : .off
         autoUpdatesCheckbox.state = prefs.autoUpdates ? .on : .off
         helperLabel.stringValue = fanService.isInstalled
@@ -123,6 +126,7 @@ final class SettingsWindowController: NSWindowController {
         thresholdLabel.font = .systemFont(ofSize: 11)
         thresholdLabel.textColor = .secondaryLabelColor
 
+        lowPowerCheckbox = checkbox("Poupar energia a baterias (intervalo ≥5 s)", action: #selector(changed))
         restoreFansCheckbox = checkbox("Restaurar automático ao sair", action: #selector(changed))
         let openFansButton = NSButton(title: "Abrir controlo das ventoinhas…", target: self, action: #selector(openFans))
         openFansButton.bezelStyle = .rounded
@@ -130,6 +134,9 @@ final class SettingsWindowController: NSWindowController {
         helperLabel = NSTextField(labelWithString: "")
         helperLabel.font = .systemFont(ofSize: 10.5)
         helperLabel.textColor = .secondaryLabelColor
+
+        let historyButton = NSButton(title: "Abrir histórico…", target: self, action: #selector(openHistory))
+        historyButton.bezelStyle = .rounded
 
         autoUpdatesCheckbox = checkbox("Atualizações automáticas", action: #selector(changed))
         let checkUpdatesButton = NSButton(title: "Procurar atualizações…", target: self, action: #selector(checkUpdates))
@@ -154,10 +161,14 @@ final class SettingsWindowController: NSWindowController {
             alertsCheckbox,
             thresholdSlider,
             thresholdLabel,
+            section("ENERGIA"),
+            lowPowerCheckbox,
             section("VENTOINHAS"),
             restoreFansCheckbox,
             openFansButton,
             helperLabel,
+            section("DADOS"),
+            historyButton,
             section("ATUALIZAÇÕES"),
             autoUpdatesCheckbox,
             checkUpdatesButton,
@@ -224,6 +235,7 @@ final class SettingsWindowController: NSWindowController {
         prefs.showIcon = iconCheckbox.state == .on
         prefs.unit = unitPopup.indexOfSelectedItem == 1 ? .fahrenheit : .celsius
         prefs.refreshInterval = intervals[max(0, min(intervalPopup.indexOfSelectedItem, intervals.count - 1))]
+        prefs.lowPowerMode = lowPowerCheckbox.state == .on
         prefs.restoreFansOnQuit = restoreFansCheckbox.state == .on
         prefs.autoUpdates = autoUpdatesCheckbox.state == .on
         onChange?()
@@ -249,5 +261,9 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func checkUpdates() {
         onCheckUpdates?()
+    }
+
+    @objc private func openHistory() {
+        onOpenHistory?()
     }
 }

@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fanController: FanController? = try? FanController()
     private var fanWindow: FanWindowController?
     private var timer: Timer?
+    private var scheduledInterval: TimeInterval = 0
     private var wakeObserver: NSObjectProtocol?
     private var lastFanReassert = Date.distantPast
     private let networkMonitor = NetworkMonitor()
@@ -25,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var diskSnapshot = DiskSnapshot.empty
     private let updateService = UpdateService()
     private let alertManager = AlertManager()
+    private let powerMonitor = PowerMonitor()
+    private var energySnapshot = EnergySnapshot.empty
+    private let history = MetricsHistory()
+    private var historyWindow: HistoryWindowController?
     private var settingsWindow: SettingsWindowController?
     private var availableUpdate: UpdateInfo?
     private var updateCheckTimer: Timer?
@@ -92,25 +97,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return image
     }
 
+    private var effectiveRefreshInterval: TimeInterval {
+        if prefs.lowPowerMode, energySnapshot.isOnBattery {
+            return max(prefs.refreshInterval, 5)
+        }
+        return prefs.refreshInterval
+    }
+
     private func scheduleTimer() {
+        let interval = effectiveRefreshInterval
+        if timer != nil, interval == scheduledInterval { return }
+
         timer?.invalidate()
-        let timer = Timer(timeInterval: prefs.refreshInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.refresh()
         }
-        timer.tolerance = min(prefs.refreshInterval * 0.2, 1)
+        timer.tolerance = min(interval * 0.2, 1)
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        scheduledInterval = interval
     }
 
     private func refresh() {
         snapshot = monitor.snapshot()
         networkSnapshot = networkMonitor.sample()
         diskSnapshot = diskMonitor.sample()
+        energySnapshot = powerMonitor.sample()
         alertManager.evaluate(snapshot: snapshot)
+
+        let diskTotals = diskSnapshot.totals(includeInternal: prefs.diskIncludeInternal)
+        history.append(HistorySample(
+            date: snapshot.date,
+            cpuMax: snapshot.cpuMax,
+            systemMax: snapshot.systemMax,
+            download: networkSnapshot.download,
+            upload: networkSnapshot.upload,
+            diskRead: diskTotals.read,
+            diskWrite: diskTotals.write,
+            cpuLoad: energySnapshot.cpuLoad
+        ))
+        historyWindow?.update(history)
         refreshFans()
         superviseManualFans()
         updateStatusItem()
         fanWindow?.update(fans: fans)
+        if effectiveRefreshInterval != scheduledInterval {
+            scheduleTimer()
+        }
     }
 
     private func superviseManualFans() {
@@ -329,6 +362,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(rowItem(name: "Outros · máxima", celsius: snapshot.otherMax))
 
         menu.addItem(.separator())
+        addEnergyItems(to: menu)
+        menu.addItem(.separator())
         addFanItems()
         menu.addItem(.separator())
         addNetworkItems(to: menu)
@@ -424,6 +459,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+
+        let historyItem = NSMenuItem(title: "Histórico…", action: #selector(openHistory), keyEquivalent: "")
+        historyItem.target = self
+        menu.addItem(historyItem)
 
         let settingsItem = NSMenuItem(title: "Definições…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
@@ -580,6 +619,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             celsius: celsius,
             bold: bold
         )
+        let item = NSMenuItem()
+        item.view = view
+        item.isEnabled = false
+        return item
+    }
+
+    private func addEnergyItems(to target: NSMenu) {
+        target.addItem(sectionHeader("Energia"))
+
+        if let cpu = energySnapshot.cpuLoad {
+            target.addItem(energyRow(name: "CPU uso", value: String(format: "%.0f %%", cpu), color: .systemBlue))
+        }
+        if let gpu = energySnapshot.gpuLoad {
+            target.addItem(energyRow(name: "GPU uso", value: String(format: "%.0f %%", gpu), color: .systemPurple))
+        }
+
+        if let battery = energySnapshot.battery {
+            var batteryValue = "\(battery.percentage) %"
+            if let temperature = battery.temperature {
+                batteryValue += String(format: " · %.0f °C", temperature)
+            }
+            target.addItem(energyRow(
+                name: "Bateria",
+                value: batteryValue,
+                color: battery.charging ? .systemGreen : .systemTeal
+            ))
+
+            if let health = battery.health {
+                var healthValue = String(format: "%.0f %%", health)
+                if let cycles = battery.cycles {
+                    healthValue += " · \(cycles) ciclos"
+                }
+                target.addItem(energyRow(name: "Saúde", value: healthValue, color: .systemGreen))
+            }
+
+            let powerValue: String
+            let powerColor: NSColor
+            if battery.externalPower {
+                if let watts = battery.adapterWatts {
+                    powerValue = String(format: "Carregador %.0f W", watts)
+                } else {
+                    powerValue = "Ligado à corrente"
+                }
+                powerColor = .systemGreen
+            } else {
+                powerValue = "Na bateria"
+                powerColor = .systemOrange
+            }
+            target.addItem(energyRow(name: "Energia", value: powerValue, color: powerColor))
+        }
+
+        if energySnapshot.cpuLoad == nil, energySnapshot.gpuLoad == nil, energySnapshot.battery == nil {
+            let item = NSMenuItem(title: "Sem dados de energia", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            target.addItem(item)
+        }
+    }
+
+    private func energyRow(name: String, value: String, color: NSColor) -> NSMenuItem {
+        let view = SensorRowView(width: menu.minimumWidth - 8, valueWidth: 150)
+        view.configure(name: name, value: value, dotColor: color)
         let item = NSMenuItem()
         item.view = view
         item.isEnabled = false
@@ -980,6 +1080,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsWindow?.reload()
     }
 
+    @objc private func openHistory() {
+        if historyWindow == nil {
+            historyWindow = HistoryWindowController(history: history)
+        }
+        historyWindow?.update(history)
+        historyWindow?.show()
+    }
+
     @objc private func openSettings() {
         if settingsWindow == nil {
             let controller = SettingsWindowController()
@@ -992,6 +1100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             controller.onCheckUpdates = { [weak self] in
                 self?.checkForUpdatesMenu()
+            }
+            controller.onOpenHistory = { [weak self] in
+                self?.openHistory()
             }
             controller.onEnableAlerts = { [weak self] in
                 self?.alertManager.requestAuthorization()

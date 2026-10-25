@@ -46,6 +46,7 @@ final class Preferences {
         static let compactRates = "compactMenuBarRates"
         static let alertsEnabled = "temperatureAlertsEnabled"
         static let alertThreshold = "temperatureAlertThreshold"
+        static let lowPowerMode = "lowPowerMode"
     }
 
     private let defaults = UserDefaults.standard
@@ -64,7 +65,8 @@ final class Preferences {
             Key.showTemperature: true,
             Key.compactRates: false,
             Key.alertsEnabled: false,
-            Key.alertThreshold: 92.0
+            Key.alertThreshold: 92.0,
+            Key.lowPowerMode: true
         ])
     }
 
@@ -184,5 +186,13 @@ final class Preferences {
             return value > 0 ? value : 92.0
         }
         set { defaults.set(newValue, forKey: Key.alertThreshold) }
+    }
+
+    var lowPowerMode: Bool {
+        get {
+            if defaults.object(forKey: Key.lowPowerMode) == nil { return true }
+            return defaults.bool(forKey: Key.lowPowerMode)
+        }
+        set { defaults.set(newValue, forKey: Key.lowPowerMode) }
     }
 }

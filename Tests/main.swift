@@ -75,6 +75,24 @@ let externalOrigin = FanWindowController.windowOrigin(
 )
 check(externalOrigin.x == 1050, "janela centrada em ecrã externo")
 
+// History
+let history = MetricsHistory(retention: 900, maxSamples: 3)
+let now = Date()
+let old = HistorySample(date: now.addingTimeInterval(-1000), cpuMax: 40, systemMax: 41, download: 1, upload: 2, diskRead: 3, diskWrite: 4, cpuLoad: 5)
+let s1 = HistorySample(date: now.addingTimeInterval(-20), cpuMax: 42, systemMax: 43, download: 1000, upload: 2000, diskRead: 3000, diskWrite: 4000, cpuLoad: 10)
+let s2 = HistorySample(date: now.addingTimeInterval(-10), cpuMax: 44, systemMax: 45, download: 1100, upload: 2100, diskRead: 3100, diskWrite: 4100, cpuLoad: 12)
+let s3 = HistorySample(date: now, cpuMax: 46, systemMax: 47, download: 1200, upload: 2200, diskRead: 3200, diskWrite: 4200, cpuLoad: 14)
+history.append(old)
+history.append(s1)
+history.append(s2)
+history.append(s3)
+check(history.samples.count == 3, "histórico limita amostras")
+check(history.samples.first?.cpuMax == 42, "histórico remove antigas")
+let csv = history.csv()
+check(csv.hasPrefix("timestamp,"), "CSV cabeçalho")
+check(csv.split(separator: "\n").count == 4, "CSV linhas")
+check(csv.contains("42.00"), "CSV valores")
+
 // Disk labels
 check(DiskKind.sdCard.label == "Cartão SD", "etiqueta cartão SD")
 check(DiskKind.usb.label == "USB", "etiqueta USB")
