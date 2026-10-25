@@ -1,5 +1,6 @@
 import Foundation
 import IOKit
+import IOKit.ps
 
 struct BatteryInfo {
     let percentage: Int
@@ -143,7 +144,7 @@ final class PowerMonitor {
 
     private func readBattery() -> BatteryInfo? {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
-        guard service != 0 else { return nil }
+        guard service != 0 else { return readIOPSBattery() }
         defer { IOObjectRelease(service) }
 
         var propertiesRef: Unmanaged<CFMutableDictionary>?
@@ -158,7 +159,9 @@ final class PowerMonitor {
             return nil
         }
 
-        guard (properties["BatteryInstalled"] as? Bool) == true else { return nil }
+        guard (properties["BatteryInstalled"] as? Bool) == true else {
+            return readIOPSBattery()
+        }
 
         let current = (properties["CurrentCapacity"] as? NSNumber)?.doubleValue ?? 0
         let maxCapacity = (properties["MaxCapacity"] as? NSNumber)?.doubleValue ?? 0
@@ -214,5 +217,43 @@ final class PowerMonitor {
             externalPower: externalPower,
             adapterWatts: adapterWatts
         )
+    }
+
+    private func readIOPSBattery() -> BatteryInfo? {
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else {
+            return nil
+        }
+
+        for source in sources {
+            guard let description = IOPSGetPowerSourceDescription(info, source)?
+                .takeUnretainedValue() as? [String: Any] else {
+                continue
+            }
+            guard (description[kIOPSTypeKey as String] as? String) == kIOPSInternalBatteryType as String else {
+                continue
+            }
+
+            let current = description[kIOPSCurrentCapacityKey as String] as? Int ?? 0
+            let maximum = description[kIOPSMaxCapacityKey as String] as? Int ?? 100
+            let percentage = maximum > 0
+                ? Int((Double(current) / Double(maximum) * 100).rounded())
+                : current
+            let charging = description[kIOPSIsChargingKey as String] as? Bool ?? false
+            let state = description[kIOPSPowerSourceStateKey as String] as? String
+            let externalPower = state == kIOPSACPowerValue as String
+
+            return BatteryInfo(
+                percentage: min(100, max(0, percentage)),
+                temperature: nil,
+                health: nil,
+                cycles: nil,
+                charging: charging,
+                externalPower: externalPower,
+                adapterWatts: nil
+            )
+        }
+
+        return nil
     }
 }

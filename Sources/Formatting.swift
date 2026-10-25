@@ -145,6 +145,24 @@ enum NetworkFormatting {
     }
 }
 
+enum BatteryStyle {
+    static let symbolName = "battery.100"
+
+    static func color(percentage: Int, charging: Bool) -> NSColor {
+        if charging {
+            return NSColor(srgbRed: 0.05, green: 0.48, blue: 0.24, alpha: 1)
+        }
+        switch percentage {
+        case 50...:
+            return NSColor(srgbRed: 0.05, green: 0.48, blue: 0.24, alpha: 1)
+        case 20..<50:
+            return NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1)
+        default:
+            return NSColor(srgbRed: 0.73, green: 0.11, blue: 0.11, alpha: 1)
+        }
+    }
+}
+
 enum DiskFormatting {
     static let readColor = NSColor(srgbRed: 0.04, green: 0.44, blue: 0.52, alpha: 1.0)
     static let writeColor = NSColor(srgbRed: 0.70, green: 0.33, blue: 0.02, alpha: 1.0)
@@ -230,6 +248,10 @@ enum StatusCapsuleImage {
     static let diskCompactTextWidth = measuredWidth([
         "R 999,9M",
         "W 999,9M"
+    ])
+    static let batteryTextWidth = measuredWidth([
+        "100%",
+        "8%"
     ])
 
     static func make(_ segments: [CapsuleSegment], leadingPadding: CGFloat = 0, trailingPadding: CGFloat = 4) -> NSImage? {

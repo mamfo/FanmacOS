@@ -342,6 +342,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 ))
             }
 
+            if prefs.showBatteryInMenuBar, let battery = energySnapshot.battery {
+                segments.append(CapsuleSegment(
+                    text: "\(battery.percentage)%",
+                    color: BatteryStyle.color(percentage: battery.percentage, charging: battery.charging),
+                    symbolName: BatteryStyle.symbolName,
+                    fixedTextWidth: StatusCapsuleImage.batteryTextWidth
+                ))
+            }
+
             if prefs.showTemperatureInMenuBar {
                 let color = value.map(TemperatureStyle.capsuleColor) ?? TemperatureStyle.capsuleFallback
                 segments.append(CapsuleSegment(
@@ -481,6 +490,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         temperatureBarItem.target = self
         temperatureBarItem.state = prefs.showTemperatureInMenuBar ? .on : .off
         menu.addItem(temperatureBarItem)
+
+        let batteryBarItem = NSMenuItem(title: "Mostrar bateria na barra", action: #selector(toggleBatteryInBar), keyEquivalent: "")
+        batteryBarItem.target = self
+        batteryBarItem.state = prefs.showBatteryInMenuBar ? .on : .off
+        menu.addItem(batteryBarItem)
 
         let networkBarItem = NSMenuItem(title: "Mostrar rede na barra", action: #selector(toggleNetworkInBar), keyEquivalent: "")
         networkBarItem.target = self
@@ -671,6 +685,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleTemperatureInBar() {
         prefs.showTemperatureInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
+    @objc private func toggleBatteryInBar() {
+        prefs.showBatteryInMenuBar.toggle()
         updateStatusItem()
         settingsWindow?.reload()
     }

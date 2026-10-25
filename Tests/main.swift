@@ -93,6 +93,11 @@ check(csv.hasPrefix("timestamp,"), "CSV cabeçalho")
 check(csv.split(separator: "\n").count == 4, "CSV linhas")
 check(csv.contains("42.00"), "CSV valores")
 
+// Battery bar
+check(StatusCapsuleImage.batteryTextWidth > 0, "largura da bateria fixa")
+check(BatteryStyle.symbolName == "battery.100", "símbolo da bateria")
+check(BatteryStyle.color(percentage: 80, charging: false) != BatteryStyle.color(percentage: 10, charging: false), "cor da bateria por nível")
+
 // Fan curve
 let curveMin = FanCurve.target(temperature: 40, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)
 let curveStart = FanCurve.target(temperature: 55, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)

@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.7.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.7.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.7.sha256` | somas de verificação |
+| `FanmacOS-2.8.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-2.8.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-2.8.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -102,6 +102,8 @@ A amostragem é feita ao mesmo ritmo das leituras; o histórico fica só em mem�
 ## Energia
 
 O menu **Energia** mostra a carga da CPU e GPU. Em Macs com bateria mostra também percentagem, temperatura, saúde, ciclos, estado de carga e potência do carregador. Em Macs sem bateria (ou ambientes virtualizados) a secção da bateria é omitida.
+
+**Mostrar bateria na barra** acrescenta uma cápsula com ícone e percentagem, colorida por nível (verde ≥50%, laranja 20–49%, vermelho <20%) e verde enquanto carrega.
 
 **Poupar energia a baterias** (nas Definições) aumenta o intervalo para pelo menos 5 s quando estás a baterias.
 
