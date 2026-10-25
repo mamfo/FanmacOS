@@ -1,5 +1,9 @@
 import AppKit
 
+private final class FlippedSettingsView: NSView {
+    override var isFlipped: Bool { true }
+}
+
 final class SettingsWindowController: NSWindowController {
     private let prefs = Preferences.shared
     private let fanService = FanControlService()
@@ -8,8 +12,10 @@ final class SettingsWindowController: NSWindowController {
     var onOpenFans: (() -> Void)?
     var onCheckUpdates: (() -> Void)?
     var onOpenHistory: (() -> Void)?
+    var onTestAlert: (() -> Void)?
     var onEnableAlerts: (() -> Void)?
 
+    private var presetPopup: NSPopUpButton!
     private var temperatureCheckbox: NSButton!
     private var batteryCheckbox: NSButton!
     private var powerCheckbox: NSButton!
@@ -22,6 +28,8 @@ final class SettingsWindowController: NSWindowController {
     private var unitPopup: NSPopUpButton!
     private var intervalPopup: NSPopUpButton!
     private var alertsCheckbox: NSButton!
+    private var systemAlertsCheckbox: NSButton!
+    private var quietCheckbox: NSButton!
     private var thresholdSlider: NSSlider!
     private var thresholdLabel: NSTextField!
     private var lowPowerCheckbox: NSButton!
@@ -33,7 +41,7 @@ final class SettingsWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 860),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 760),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -67,6 +75,7 @@ final class SettingsWindowController: NSWindowController {
     func reload() {
         guard temperatureCheckbox != nil else { return }
 
+        updatePresetSelection()
         temperatureCheckbox.state = prefs.showTemperatureInMenuBar ? .on : .off
         batteryCheckbox.state = prefs.showBatteryInMenuBar ? .on : .off
         powerCheckbox.state = prefs.showPowerInMenuBar ? .on : .off
@@ -79,6 +88,8 @@ final class SettingsWindowController: NSWindowController {
         unitPopup.selectItem(at: prefs.unit == .fahrenheit ? 1 : 0)
         intervalPopup.selectItem(at: intervals.firstIndex(of: prefs.refreshInterval) ?? 1)
         alertsCheckbox.state = prefs.alertsEnabled ? .on : .off
+        systemAlertsCheckbox.state = prefs.systemAlertsEnabled ? .on : .off
+        quietCheckbox.state = prefs.quietHoursEnabled ? .on : .off
         thresholdSlider.doubleValue = prefs.alertThreshold
         thresholdLabel.stringValue = String(format: "Limite: %.0f °C", prefs.alertThreshold)
         lowPowerCheckbox.state = prefs.lowPowerMode ? .on : .off
@@ -97,6 +108,17 @@ final class SettingsWindowController: NSWindowController {
         let content = NSView()
         window.contentView = content
 
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        content.addSubview(scrollView)
+
+        let document = FlippedSettingsView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.documentView = document
+
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -105,6 +127,18 @@ final class SettingsWindowController: NSWindowController {
 
         let title = NSTextField(labelWithString: "Definições")
         title.font = .systemFont(ofSize: 17, weight: .semibold)
+
+        presetPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        presetPopup.addItems(withTitles: BarPreset.allCases.map(\.title) + ["Personalizado"])
+        presetPopup.target = self
+        presetPopup.action = #selector(presetChanged)
+
+        let presetRow = NSStackView(views: [
+            NSTextField(labelWithString: "Preset da barra:"),
+            presetPopup
+        ])
+        presetRow.orientation = .horizontal
+        presetRow.spacing = 8
 
         temperatureCheckbox = checkbox("Mostrar temperatura na barra", action: #selector(changed))
         batteryCheckbox = checkbox("Mostrar bateria na barra", action: #selector(changed))
@@ -132,7 +166,11 @@ final class SettingsWindowController: NSWindowController {
 
         let dragNote = note("Mantém ⌘ e arrasta o item na barra para o colocares junto ao relógio. O macOS guarda a posição.")
 
-        alertsCheckbox = checkbox("Ativar alertas de temperatura", action: #selector(alertsChanged))
+        alertsCheckbox = checkbox("Ativar alertas", action: #selector(alertsChanged))
+        systemAlertsCheckbox = checkbox("Bateria baixa, ventoinhas, carga alta e disco cheio", action: #selector(systemAlertsChanged))
+        quietCheckbox = checkbox("Silêncio das notificações das 23:00 às 08:00", action: #selector(quietChanged))
+        let testAlertButton = NSButton(title: "Enviar notificação de teste", target: self, action: #selector(testAlert))
+        testAlertButton.bezelStyle = .rounded
         thresholdSlider = NSSlider(value: prefs.alertThreshold, minValue: 60, maxValue: 105, target: self, action: #selector(thresholdChanged))
         thresholdSlider.isContinuous = false
         thresholdSlider.translatesAutoresizingMaskIntoConstraints = false
@@ -163,6 +201,7 @@ final class SettingsWindowController: NSWindowController {
         let views: [NSView] = [
             title,
             section("BARRA DE MENUS"),
+            presetRow,
             temperatureCheckbox,
             batteryCheckbox,
             powerCheckbox,
@@ -177,6 +216,9 @@ final class SettingsWindowController: NSWindowController {
             dragNote,
             section("ALERTAS"),
             alertsCheckbox,
+            systemAlertsCheckbox,
+            quietCheckbox,
+            testAlertButton,
             thresholdSlider,
             thresholdLabel,
             section("ENERGIA"),
@@ -196,12 +238,17 @@ final class SettingsWindowController: NSWindowController {
             stack.addArrangedSubview(view)
         }
 
-        content.addSubview(stack)
+        document.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -18),
+            scrollView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: content.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            document.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 18),
+            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -18),
             dragNote.widthAnchor.constraint(equalTo: stack.widthAnchor),
             thresholdSlider.widthAnchor.constraint(equalTo: stack.widthAnchor)
         ])
@@ -252,6 +299,7 @@ final class SettingsWindowController: NSWindowController {
         prefs.showPowerInMenuBar = powerCheckbox.state == .on
         prefs.showCPUInMenuBar = cpuCheckbox.state == .on
         prefs.showRAMInMenuBar = ramCheckbox.state == .on
+        updatePresetSelection()
         prefs.showDiskInMenuBar = diskCheckbox.state == .on
         prefs.compactRates = compactCheckbox.state == .on
         prefs.showIcon = iconCheckbox.state == .on
@@ -263,12 +311,43 @@ final class SettingsWindowController: NSWindowController {
         onChange?()
     }
 
+    private func updatePresetSelection() {
+        guard presetPopup != nil else { return }
+        let current = BarPreset.matching(prefs)
+        if let current, let index = BarPreset.allCases.firstIndex(of: current) {
+            presetPopup.selectItem(at: index)
+        } else {
+            presetPopup.selectItem(at: BarPreset.allCases.count)
+        }
+    }
+
+    @objc private func presetChanged() {
+        let index = presetPopup.indexOfSelectedItem
+        guard index >= 0, index < BarPreset.allCases.count else { return }
+        BarPreset.allCases[index].apply(to: prefs)
+        reload()
+        onChange?()
+    }
+
     @objc private func alertsChanged() {
         prefs.alertsEnabled = alertsCheckbox.state == .on
         if prefs.alertsEnabled {
             onEnableAlerts?()
         }
         onChange?()
+    }
+
+    @objc private func systemAlertsChanged() {
+        prefs.systemAlertsEnabled = systemAlertsCheckbox.state == .on
+        onChange?()
+    }
+
+    @objc private func quietChanged() {
+        prefs.quietHoursEnabled = quietCheckbox.state == .on
+    }
+
+    @objc private func testAlert() {
+        onTestAlert?()
     }
 
     @objc private func thresholdChanged() {

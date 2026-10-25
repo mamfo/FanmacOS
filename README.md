@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-2.10.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-2.10.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-2.10.sha256` | somas de verificação |
+| `FanmacOS-3.0.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-3.0.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-3.0.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -85,8 +85,8 @@ O código e os releases vivem em [github.com/mamfo/FanmacOS](https://github.com/
 
 Para publicar uma versão nova:
 
-1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `2.8`).
-2. Faz commit e cria a tag `v2.8`; envia-a para o GitHub.
+1. Atualiza `CFBundleShortVersionString` em `Resources/Info.plist` (por exemplo `3.1`).
+2. Faz commit e cria a tag `v3.1`; envia-a para o GitHub.
 3. O workflow `.github/workflows/release.yml` compila a app num runner macOS, gera DMG, ZIP e SHA-256 e cria o release automaticamente.
 
 A primeira instalação de uma versão com atualizador tem de ser feita manualmente (arrastar para Aplicações). A partir daí, as máquinas recebem as versões seguintes sem intervenção.
@@ -166,6 +166,30 @@ O assistente pode ser removido em **menu → Remover assistente de ventoinhas…
 No ecrã integrado do MacBook, a janela de controlo fica fixa ao lado esquerdo do notch/webcam (ancorada à área do notch).
 
 Por omissão, o app devolve as ventoinhas ao modo automático ao sair. Se o app for forçado a encerrar (crash ou Force Quit), a velocidade manual pode permanecer ativa até usar **Tudo automático** ou reiniciar o Mac. Após acordar de suspensão — ou se o macOS alterar a velocidade — as velocidades manuais guardadas são reaplicadas.
+
+### Perfis de ventoinha
+
+Na janela das ventoinhas, além da curva personalizada, há perfis prontos:
+
+| Perfil | Início | Máximo |
+| --- | --- | --- |
+| Silencioso | 70 °C | 100 °C |
+| Equilibrado | 55 °C | 90 °C |
+| Desempenho | 45 °C | 80 °C |
+
+Ao mover os sliders, o perfil passa a **Personalizado**.
+
+### Alertas
+
+Com **Alertas** ligado, o FanmacOS pode notificar:
+
+- Temperatura acima do limite configurável.
+- Bateria ≤20% (e a descarregar).
+- Ventoinha manual/curva sem atingir a velocidade alvo.
+- CPU ou RAM ≥90% durante 5 minutos.
+- Menos de 5 GB (ou 5%) livres no disco do sistema.
+
+Há **silêncio das 23:00 às 08:00** e um botão de notificação de teste nas Definições.
 
 ### Curva automática e watchdog
 

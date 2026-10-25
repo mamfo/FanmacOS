@@ -93,6 +93,20 @@ check(csv.hasPrefix("timestamp,"), "CSV cabeçalho")
 check(csv.split(separator: "\n").count == 4, "CSV linhas")
 check(csv.contains("42.00"), "CSV valores")
 
+// Alerts quiet hours
+check(AlertManager.isQuiet(hour: 23, start: 23, end: 8), "silêncio às 23h")
+check(AlertManager.isQuiet(hour: 3, start: 23, end: 8), "silêncio às 3h")
+check(!AlertManager.isQuiet(hour: 8, start: 23, end: 8), "fim do silêncio às 8h")
+check(!AlertManager.isQuiet(hour: 12, start: 23, end: 8), "sem silêncio ao meio-dia")
+check(AlertManager.isQuiet(hour: 10, start: 9, end: 12), "silêncio no intervalo diurno")
+
+// Bar presets
+check(BarPreset.minimum.flags.temperature && !BarPreset.minimum.flags.network, "preset mínimo")
+check(BarPreset.temperatures.flags.temperature && BarPreset.temperatures.flags.battery && !BarPreset.temperatures.flags.cpu, "preset temperaturas")
+check(BarPreset.network.flags.network && !BarPreset.network.flags.temperature, "preset rede")
+check(BarPreset.energy.flags.cpu && BarPreset.energy.flags.ram && !BarPreset.energy.flags.temperature, "preset energia")
+check(BarPreset.all.flags.temperature && BarPreset.all.flags.ram && BarPreset.all.flags.disk, "preset tudo")
+
 // Battery and power bar
 check(StatusCapsuleImage.batteryTextWidth > 0, "largura da bateria fixa")
 check(StatusCapsuleImage.usageTextWidth > 0, "largura do uso fixa")
@@ -102,6 +116,12 @@ check(StatusCapsuleImage.powerTextWidth > 0, "largura do consumo fixa")
 check(PowerStyle.text(9.3).hasSuffix("W"), "texto de consumo")
 check(BatteryStyle.symbolName == "battery.100", "símbolo da bateria")
 check(BatteryStyle.color(percentage: 80, charging: false) != BatteryStyle.color(percentage: 10, charging: false), "cor da bateria por nível")
+
+// Fan profiles
+check(FanProfile.silent.start == 70 && FanProfile.silent.full == 100, "perfil silencioso")
+check(FanProfile.balanced.start == 55 && FanProfile.balanced.full == 90, "perfil equilibrado")
+check(FanProfile.performance.start == 45 && FanProfile.performance.full == 80, "perfil desempenho")
+check(FanProfile.matching(start: 55, full: 90) == .balanced, "deteção de perfil")
 
 // Fan curve
 let curveMin = FanCurve.target(temperature: 40, start: 55, full: 90, minRPM: 1100, maxRPM: 3500)

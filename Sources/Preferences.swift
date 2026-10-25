@@ -54,6 +54,8 @@ final class Preferences {
         static let showPower = "showPowerInMenuBar"
         static let showCPU = "showCPUInMenuBar"
         static let showRAM = "showRAMInMenuBar"
+        static let systemAlerts = "systemAlertsEnabled"
+        static let quietHours = "quietHoursEnabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -80,7 +82,9 @@ final class Preferences {
             Key.showBattery: true,
             Key.showPower: true,
             Key.showCPU: true,
-            Key.showRAM: true
+            Key.showRAM: true,
+            Key.systemAlerts: true,
+            Key.quietHours: false
         ])
     }
 
@@ -261,5 +265,18 @@ final class Preferences {
             return defaults.bool(forKey: Key.showRAM)
         }
         set { defaults.set(newValue, forKey: Key.showRAM) }
+    }
+
+    var systemAlertsEnabled: Bool {
+        get {
+            if defaults.object(forKey: Key.systemAlerts) == nil { return true }
+            return defaults.bool(forKey: Key.systemAlerts)
+        }
+        set { defaults.set(newValue, forKey: Key.systemAlerts) }
+    }
+
+    var quietHoursEnabled: Bool {
+        get { defaults.bool(forKey: Key.quietHours) }
+        set { defaults.set(newValue, forKey: Key.quietHours) }
     }
 }

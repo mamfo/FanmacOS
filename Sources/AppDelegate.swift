@@ -153,7 +153,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         networkSnapshot = networkMonitor.sample()
         diskSnapshot = diskMonitor.sample()
         energySnapshot = powerMonitor.sample()
-        alertManager.evaluate(snapshot: snapshot)
 
         let diskTotals = diskSnapshot.totals(includeInternal: prefs.diskIncludeInternal)
         history.append(HistorySample(
@@ -170,6 +169,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshFans()
         superviseManualFans()
         updateFanCurve()
+
+        let diskSpace = systemDiskSpace()
+        alertManager.evaluate(
+            snapshot: snapshot,
+            energy: energySnapshot,
+            fans: fans,
+            diskFreeBytes: diskSpace?.free,
+            diskTotalBytes: diskSpace?.total
+        )
+
         updateStatusItem()
         fanWindow?.update(fans: fans)
         if effectiveRefreshInterval != scheduledInterval {
@@ -261,6 +270,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         curveTarget = target
         fanCurveController.update(target: target)
         fanWindow?.setCurveStatus(active: true, target: target, temperature: average, message: nil)
+    }
+
+    private func systemDiskSpace() -> (free: Int64, total: Int64)? {
+        let url = URL(fileURLWithPath: "/")
+        guard let values = try? url.resourceValues(forKeys: [
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeTotalCapacityKey
+        ]),
+            let free = values.volumeAvailableCapacityForImportantUsage,
+            let total = values.volumeTotalCapacity else {
+            return nil
+        }
+        return (free, Int64(total))
     }
 
     private func reapplyManualFans() {
@@ -511,6 +533,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         iconItem.state = prefs.showIcon ? .on : .off
         menu.addItem(iconItem)
 
+        let presetItem = NSMenuItem(title: "Preset da barra", action: nil, keyEquivalent: "")
+        let presetMenu = NSMenu(title: "Preset da barra")
+        let currentPreset = BarPreset.matching(prefs)
+        for preset in BarPreset.allCases {
+            let item = NSMenuItem(title: preset.title, action: #selector(selectBarPreset), keyEquivalent: "")
+            item.target = self
+            item.representedObject = preset.rawValue
+            item.state = currentPreset == preset ? .on : .off
+            presetMenu.addItem(item)
+        }
+        let customItem = NSMenuItem(title: "Personalizado", action: nil, keyEquivalent: "")
+        customItem.state = currentPreset == nil ? .on : .off
+        customItem.isEnabled = false
+        presetMenu.addItem(customItem)
+        presetItem.submenu = presetMenu
+        menu.addItem(presetItem)
+
         let temperatureBarItem = NSMenuItem(title: "Mostrar temperatura na barra", action: #selector(toggleTemperatureInBar), keyEquivalent: "")
         temperatureBarItem.target = self
         temperatureBarItem.state = prefs.showTemperatureInMenuBar ? .on : .off
@@ -573,7 +612,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autoUpdateItem.state = prefs.autoUpdates ? .on : .off
         menu.addItem(autoUpdateItem)
 
-        let alertsItem = NSMenuItem(title: "Alertas de temperatura", action: #selector(toggleTemperatureAlerts), keyEquivalent: "")
+        let alertsItem = NSMenuItem(title: "Alertas", action: #selector(toggleTemperatureAlerts), keyEquivalent: "")
         alertsItem.target = self
         alertsItem.state = prefs.alertsEnabled ? .on : .off
         menu.addItem(alertsItem)
@@ -725,6 +764,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleTemperatureInBar() {
         prefs.showTemperatureInMenuBar.toggle()
+        updateStatusItem()
+        settingsWindow?.reload()
+    }
+
+    @objc private func selectBarPreset(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let preset = BarPreset(rawValue: raw) else { return }
+        preset.apply(to: prefs)
         updateStatusItem()
         settingsWindow?.reload()
     }
@@ -1308,6 +1355,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             controller.onOpenHistory = { [weak self] in
                 self?.openHistory()
+            }
+            controller.onTestAlert = { [weak self] in
+                self?.alertManager.sendTestNotification()
             }
             controller.onEnableAlerts = { [weak self] in
                 self?.alertManager.requestAuthorization()

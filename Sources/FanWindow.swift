@@ -16,6 +16,7 @@ final class FanWindowController: NSWindowController {
     private var curveActive = false
     private var isUpdatingCurve = false
     private var curveCheckbox: NSButton!
+    private var profilePopup: NSPopUpButton!
     private var curveStartSlider: NSSlider!
     private var curveFullSlider: NSSlider!
     private var curveStartLabel: NSTextField!
@@ -113,6 +114,7 @@ final class FanWindowController: NSWindowController {
         isUpdatingCurve = true
         curveCheckbox.state = prefs.fanCurveEnabled ? .on : .off
         let settings = FanCurve.normalizedSettings(start: prefs.fanCurveStart, full: prefs.fanCurveFull)
+        updateProfileSelection(start: settings.start, full: settings.full)
         curveStartSlider.doubleValue = settings.start
         curveFullSlider.doubleValue = settings.full
         updateCurveLabels()
@@ -146,6 +148,16 @@ final class FanWindowController: NSWindowController {
     private func updateCurveLabels() {
         curveStartLabel.stringValue = String(format: "Início: %.0f °C", curveStartSlider.doubleValue)
         curveFullLabel.stringValue = String(format: "Máximo: %.0f °C", curveFullSlider.doubleValue)
+    }
+
+    private func updateProfileSelection(start: Double, full: Double) {
+        guard profilePopup != nil else { return }
+        if let profile = FanProfile.matching(start: start, full: full),
+           let index = FanProfile.allCases.firstIndex(of: profile) {
+            profilePopup.selectItem(at: index)
+        } else {
+            profilePopup.selectItem(at: FanProfile.allCases.count)
+        }
     }
 
     func update(fans: [FanInfo]) {
@@ -191,6 +203,18 @@ final class FanWindowController: NSWindowController {
         curveCheckbox.font = .systemFont(ofSize: 12, weight: .medium)
         curveCheckbox.state = prefs.fanCurveEnabled ? .on : .off
 
+        profilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        profilePopup.addItems(withTitles: FanProfile.allCases.map(\.title) + ["Personalizado"])
+        profilePopup.target = self
+        profilePopup.action = #selector(curveProfileChanged)
+
+        let profileRow = NSStackView(views: [
+            NSTextField(labelWithString: "Perfil:"),
+            profilePopup
+        ])
+        profileRow.orientation = .horizontal
+        profileRow.spacing = 8
+
         let curveSettings = FanCurve.normalizedSettings(start: prefs.fanCurveStart, full: prefs.fanCurveFull)
         curveStartLabel = NSTextField(labelWithString: "")
         curveStartLabel.font = .systemFont(ofSize: 10.5)
@@ -223,6 +247,7 @@ final class FanWindowController: NSWindowController {
 
         let curveStack = NSStackView(views: [
             curveCheckbox,
+            profileRow,
             curveStartLabel,
             curveStartSlider,
             curveFullLabel,
@@ -494,7 +519,23 @@ final class FanWindowController: NSWindowController {
         curveStartSlider.doubleValue = settings.start
         curveFullSlider.doubleValue = settings.full
         updateCurveLabels()
+        updateProfileSelection(start: settings.start, full: settings.full)
         onCurveSettingsChanged?(settings.start, settings.full)
+    }
+
+    @objc private func curveProfileChanged() {
+        guard !isUpdatingCurve else { return }
+        let index = profilePopup.indexOfSelectedItem
+        guard index >= 0, index < FanProfile.allCases.count else { return }
+        let profile = FanProfile.allCases[index]
+
+        isUpdatingCurve = true
+        curveStartSlider.doubleValue = profile.start
+        curveFullSlider.doubleValue = profile.full
+        updateCurveLabels()
+        isUpdatingCurve = false
+
+        onCurveSettingsChanged?(profile.start, profile.full)
     }
 
     @objc private func toggleRestore() {
