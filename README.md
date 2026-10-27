@@ -59,9 +59,9 @@ Cria em `dist/`:
 
 | Ficheiro | Uso |
 | --- | --- |
-| `FanmacOS-3.0.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
-| `FanmacOS-3.0.zip` | alternativa portátil, com a app já assinada |
-| `FanmacOS-3.0.sha256` | somas de verificação |
+| `FanmacOS-3.1.dmg` | abrir e arrastar `FanmacOS.app` para `Applications` |
+| `FanmacOS-3.1.zip` | alternativa portátil, com a app já assinada |
+| `FanmacOS-3.1.sha256` | somas de verificação |
 
 O DMG inclui um ficheiro `LEIA-ME.txt` com os passos. No outro Mac:
 
@@ -137,7 +137,9 @@ Cada família é classificada assim:
 
 O tráfego é lido localmente através de `sysctl(NET_RT_IFLIST2)`, que expõe contadores de 64 bits por interface. São consideradas as interfaces físicas `en*` (Wi‑Fi, Ethernet, Thunderbolt, iPhone USB) e `pdp_ip*`; interfaces virtuais (`utun`, `awdl`, `llw`, `bridge`) não entram na soma. A velocidade é calculada entre amostras consecutivas e atualizada ao mesmo ritmo das temperaturas.
 
-No menu aparecem os totais **↓ Receber** / **↑ Enviar** e um submenu **Interfaces** com cada placa. As cápsulas de rede fazem parte do item único da app, o mais à direita possível (junto ao relógio), e podem ser escondidas em **Mostrar rede na barra**.
+No menu aparecem os totais **↓ Receber** / **↑ Enviar**, um submenu **Interfaces** com cada placa e um submenu **Endereços** com os IPs internos e o IP público. Passa o rato sobre o item da barra para ver no tooltip os IPs internos (`en*`/`pdp_ip*`) e o IP público. As cápsulas de rede fazem parte do item único da app, o mais à direita possível (junto ao relógio), e podem ser escondidas em **Mostrar rede na barra**.
+
+O IP público é obtido a cada ~15 minutos (e ao acordar) através de `api.ipify.org`/`icanhazip.com`; só é mostrado localmente e não é enviado para mais nenhum serviço.
 
 ### Discos
 

@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastFanReassert = Date.distantPast
     private let networkMonitor = NetworkMonitor()
     private var networkSnapshot = NetworkSnapshot.empty
+    private var networkAddresses: [NetworkAddress] = []
+    private let publicIPService = PublicIPService()
     private let diskMonitor = DiskMonitor()
     private var diskSnapshot = DiskSnapshot.empty
     private let updateService = UpdateService()
@@ -47,6 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.minimumWidth = 284
         statusItem.menu = menu
+
+        publicIPService.onChange = { [weak self] in
+            self?.updateStatusItem()
+        }
 
         refresh()
         if !fans.contains(where: { $0.manual }) {
@@ -87,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.fanController = try? FanController()
             self.networkMonitor.reset()
             self.diskMonitor.reset()
+            self.publicIPService.refreshIfNeeded(force: true)
             self.refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 self?.reapplyManualFans()
@@ -151,6 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func refresh() {
         snapshot = monitor.snapshot()
         networkSnapshot = networkMonitor.sample()
+        networkAddresses = NetworkAddressMonitor.current()
+        publicIPService.refreshIfNeeded()
         diskSnapshot = diskMonitor.sample()
         energySnapshot = powerMonitor.sample()
 
@@ -470,6 +479,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lines.append("Ventoinha \(fan.index + 1): \(FanCardView.rpmText(fan.actualRPM))\(fan.manual ? " · manual" : "")")
         }
         lines.append("Rede ↓ \(NetworkFormatting.rate(networkSnapshot.download))  ↑ \(NetworkFormatting.rate(networkSnapshot.upload))")
+        let internalAddresses = networkAddresses.compactMap { address -> String? in
+            guard let ip = address.primary else { return nil }
+            return "\(address.interface) \(ip)"
+        }
+        if !internalAddresses.isEmpty {
+            lines.append("IP interno: " + internalAddresses.joined(separator: " · "))
+        }
+        lines.append("IP público: \(publicIPService.ip ?? "a obter…")")
         for disk in relevantDisks {
             lines.append("\(disk.name): R \(RateFormatting.rate(disk.readRate))  W \(RateFormatting.rate(disk.writeRate))")
         }
@@ -717,6 +734,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         interfacesItem.submenu = submenu
         target.addItem(interfacesItem)
+
+        let addressesItem = NSMenuItem(title: "Endereços", action: nil, keyEquivalent: "")
+        let addressesMenu = NSMenu(title: "Endereços")
+        addressesMenu.minimumWidth = 284
+
+        if networkAddresses.isEmpty {
+            let empty = NSMenuItem(title: "Sem IP interno", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            addressesMenu.addItem(empty)
+        } else {
+            for address in networkAddresses {
+                let row = SensorRowView(width: addressesMenu.minimumWidth - 8, valueWidth: 180)
+                row.configure(
+                    name: address.interface,
+                    value: address.primary ?? "—",
+                    dotColor: .systemTeal
+                )
+                let item = NSMenuItem()
+                item.view = row
+                item.isEnabled = false
+                addressesMenu.addItem(item)
+            }
+        }
+
+        let publicRow = SensorRowView(width: addressesMenu.minimumWidth - 8, valueWidth: 180)
+        publicRow.configure(
+            name: "IP público",
+            value: publicIPService.ip ?? "a obter…",
+            dotColor: .systemBlue
+        )
+        let publicItem = NSMenuItem()
+        publicItem.view = publicRow
+        publicItem.isEnabled = false
+        addressesMenu.addItem(publicItem)
+
+        addressesItem.submenu = addressesMenu
+        target.addItem(addressesItem)
     }
 
     private func networkRow(name: String, value: String, color: NSColor) -> NSMenuItem {
